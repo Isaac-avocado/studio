@@ -20,3 +20,10 @@ export interface TrafficInfraction {
   name: string;
 }
 
+export interface FirestoreUser {
+  uid: string;
+  username: string; // Corresponds to Firebase Auth displayName
+  email: string;
+  createdAt: string;
+  photoURL?: string | null;
+}

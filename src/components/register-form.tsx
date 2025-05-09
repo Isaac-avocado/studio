@@ -75,6 +75,7 @@ export function RegisterForm() {
           username: values.username,
           email: values.email,
           createdAt: new Date().toISOString(),
+          photoURL: null, // Initialize photoURL
         });
       }
 

@@ -2,6 +2,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,12 +16,14 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
+let storage: FirebaseStorage;
 
 if (!getApps().length) {
   try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    storage = getStorage(app);
   } catch (error) {
     console.error('Firebase initialization error', error);
     // Fallback or throw error, depending on how critical Firebase is for the app to start
@@ -31,6 +34,7 @@ if (!getApps().length) {
   app = getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 }
 
 // Check if Firebase config is loaded
@@ -45,4 +49,4 @@ if (
 }
 
 
-export { app, auth, db };
+export { app, auth, db, storage };
