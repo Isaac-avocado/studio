@@ -69,18 +69,18 @@ export function AiSuggester() {
 
   return (
     <Card className="shadow-xl">
-      <CardHeader className="text-center">
-        <div className="flex justify-center items-center mb-2">
+      <CardHeader className="text-center ">
+        <div className="flex justify-center items-center mb-2 animate-in fade-in-0 zoom-in-95 duration-300 delay-100">
           <BrainCircuit className="w-12 h-12 text-primary" />
         </div>
-        <CardTitle className="text-2xl">Asesor IA de Artículos</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-2xl animate-in fade-in-0 slide-in-from-top-2 duration-300 delay-200">Asesor IA de Artículos</CardTitle>
+        <CardDescription className="animate-in fade-in-0 slide-in-from-top-2 duration-300 delay-300">
           Selecciona una infracción y nuestra IA te sugerirá artículos relevantes para entender mejor tus obligaciones y regulaciones.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-400">
             <FormField
               control={form.control}
               name="trafficInfraction"
@@ -120,14 +120,14 @@ export function AiSuggester() {
         </Form>
 
         {error && (
-          <Alert variant="destructive" className="mt-6">
+          <Alert variant="destructive" className="mt-6 animate-in fade-in-0 duration-500">
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         {suggestions.length > 0 && (
-          <div className="mt-8">
+          <div className="mt-8 animate-in fade-in-0 duration-500">
             <h3 className="text-lg font-semibold mb-3 text-primary">Artículos Sugeridos:</h3>
             <ul className="list-disc list-inside space-y-2 bg-secondary/50 p-4 rounded-md border">
               {suggestions.map((suggestion, index) => (
@@ -137,7 +137,7 @@ export function AiSuggester() {
           </div>
         )}
          { !isLoading && suggestions.length === 0 && form.formState.isSubmitted && !error && (
-           <p className="mt-6 text-sm text-muted-foreground text-center">No se encontraron sugerencias específicas para esta infracción en este momento.</p>
+           <p className="mt-6 text-sm text-muted-foreground text-center animate-in fade-in-0 duration-500">No se encontraron sugerencias específicas para esta infracción en este momento.</p>
          )}
       </CardContent>
     </Card>

@@ -14,27 +14,31 @@ export default function DashboardPage() {
   return (
     <div className="bg-[hsl(var(--dashboard-background))] text-[hsl(var(--dashboard-foreground))] -m-4 md:-m-8 p-4 md:p-8 min-h-[calc(100vh-var(--header-height,10rem))] rounded-lg shadow-inner">
       <div className="container mx-auto">
-        <section className="mb-12">
-          <div className="flex items-center gap-3 mb-6">
+        <section className="mb-12 animate-in fade-in-0 slide-in-from-top-5 duration-500">
+          <div className="flex items-center gap-3 mb-6 ">
             <Lightbulb className="w-10 h-10 text-primary-foreground drop-shadow-sm" />
             <h2 className="text-3xl font-bold text-primary-foreground drop-shadow-sm">Asesoría con IA</h2>
           </div>
-          <AiSuggester />
+          <div className="animate-in fade-in-0 slide-in-from-bottom-5 duration-500 delay-100">
+            <AiSuggester />
+          </div>
         </section>
 
-        <section>
-          <div className="flex items-center gap-3 mb-8">
+        <section className="animate-in fade-in-0 slide-in-from-top-5 duration-500 delay-200">
+          <div className="flex items-center gap-3 mb-8 ">
              <Newspaper className="w-10 h-10 text-primary-foreground drop-shadow-sm" />
             <h2 className="text-3xl font-bold text-primary-foreground drop-shadow-sm">Artículos Destacados</h2>
           </div>
           {articles.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {articles.map((article) => (
-                <ArticleCard key={article.slug} article={article} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ">
+              {articles.map((article, index) => (
+                <div key={article.slug} className="animate-in fade-in-0 slide-in-from-bottom-5 duration-500" style={{ animationDelay: `${200 + index * 100}ms` }}>
+                  <ArticleCard article={article} />
+                </div>
               ))}
             </div>
           ) : (
-            <p className="text-center text-lg text-primary-foreground/80">No hay artículos disponibles en este momento.</p>
+            <p className="text-center text-lg text-primary-foreground/80 animate-in fade-in-0 duration-500 delay-300">No hay artículos disponibles en este momento.</p>
           )}
         </section>
       </div>

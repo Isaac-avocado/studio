@@ -112,107 +112,111 @@ export function RegisterForm() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-       <Card className="w-full max-w-md shadow-xl">
+       <Card className="w-full max-w-md shadow-xl animate-in fade-in-0 zoom-in-95 duration-300">
         <CardHeader className="p-6">
           <Link href="/login" className="absolute top-6 left-6 text-primary hover:opacity-80 transition-opacity md:top-10 md:left-10">
             <ArrowLeft size={24} />
           </Link>
           <div className="flex flex-col items-center pt-8">
-             <div className="mb-6 p-5 rounded-full bg-[hsl(var(--dashboard-background))]">
+             <div className="mb-6 p-5 rounded-full bg-[hsl(var(--dashboard-background))] animate-in fade-in-0 zoom-in-95 duration-500 delay-200">
                 <UserPlus size={60} className="text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold text-primary">Bienvenido</h1>
+            <h1 className="text-3xl font-bold text-primary animate-in fade-in-0 slide-in-from-top-3 duration-500 delay-300">Bienvenido</h1>
           </div>
         </CardHeader>
         <CardContent className="p-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label htmlFor="username" className="text-primary">Nombre de usuario</Label>
-                    <FormControl>
-                      <Input
-                        id="username"
-                        placeholder="Tu nombre de usuario"
-                        {...field}
-                        className="mt-1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label htmlFor="email" className="text-primary">Correo electrónico</Label>
-                    <FormControl>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="tu@correo.com"
-                        {...field}
-                        className="mt-1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label htmlFor="password" className="text-primary">Contraseña</Label>
-                    <FormControl>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                        className="mt-1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label htmlFor="confirmPassword" className="text-primary">Confirmar Contraseña</Label>
-                    <FormControl>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                        className="mt-1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full text-lg py-3 h-auto mt-6" disabled={isLoading}>
-                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Registrarse'}
-              </Button>
-            </form>
-          </Form>
-          <div className="mt-6 text-center">
-            <Link href="/login" legacyBehavior>
-              <a className="text-sm text-primary hover:underline">
-                Iniciar sesión
-              </a>
-            </Link>
+          <div className="animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-400">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label htmlFor="username" className="text-primary">Nombre de usuario</Label>
+                      <FormControl>
+                        <Input
+                          id="username"
+                          placeholder="Tu nombre de usuario"
+                          {...field}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label htmlFor="email" className="text-primary">Correo electrónico</Label>
+                      <FormControl>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="tu@correo.com"
+                          {...field}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label htmlFor="password" className="text-primary">Contraseña</Label>
+                      <FormControl>
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label htmlFor="confirmPassword" className="text-primary">Confirmar Contraseña</Label>
+                      <FormControl>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full text-lg py-3 h-auto mt-6" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Registrarse'}
+                </Button>
+              </form>
+            </Form>
+          </div>
+          <div className="animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-500">
+            <div className="mt-6 text-center">
+              <Link href="/login" legacyBehavior>
+                <a className="text-sm text-primary hover:underline">
+                  Iniciar sesión
+                </a>
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>
