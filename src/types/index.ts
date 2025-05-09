@@ -12,9 +12,11 @@ export interface Article {
     conclusion?: string;
   };
   readMoreLink?: string;
+  favoriteCount: number;
 }
 
 export interface TrafficInfraction {
   id: string;
   name: string;
 }
+
