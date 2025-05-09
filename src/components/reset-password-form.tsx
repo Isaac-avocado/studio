@@ -14,8 +14,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Mail, UserCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, UserCircle, Loader2 } from 'lucide-react'; // UserCircle was used for consistency with login/register icon, Mail can be an alternative
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const resetPasswordSchema = z.object({
   email: z.string().email('Correo electrónico inválido.'),
@@ -27,6 +29,8 @@ export function ResetPasswordForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  // Note: ResetPasswordForm typically doesn't have an `isCheckingAuth` state like login/register.
+  // Skeleton here would be for a hypothetical initial loading state or for UI consistency if one were added.
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -62,9 +66,42 @@ export function ResetPasswordForm() {
     }
   }
 
+  // Example skeleton structure if an initial loading state was present
+  // const [isInitialLoading, setIsInitialLoading] = useState(false); 
+  // if (isInitialLoading) {
+  //   return (
+  // <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+  //   <Card className="w-full max-w-md shadow-xl">
+  //     <CardHeader className="p-6">
+  //       <Skeleton className="absolute top-6 left-6 md:top-10 md:left-10 h-6 w-6 rounded" /> {/* Back Arrow */}
+  //       <div className="flex flex-col items-center pt-8">
+  //         <Skeleton className="mb-6 h-[100px] w-[100px] rounded-full" /> {/* Icon container */}
+  //         <Skeleton className="h-9 w-4/5 mb-2 rounded" /> {/* Title */}
+  //       </div>
+  //     </CardHeader>
+  //     <CardContent className="p-6">
+  //       <Skeleton className="h-5 w-full mb-6 rounded" /> {/* Subtitle Paragraph */}
+  //       <div className="space-y-6">
+  //         <div className="space-y-2">
+  //           <Skeleton className="h-4 w-1/3 rounded" /> {/* Label */}
+  //           <Skeleton className="h-10 w-full rounded-md" /> {/* Input */}
+  //         </div>
+  //         <Skeleton className="h-12 w-full rounded-md py-3" /> {/* Submit Button */}
+  //       </div>
+  //       <Skeleton className="h-12 w-full mt-4 rounded-md py-3" /> {/* Back to Login Button */}
+  //       <div className="mt-6 text-center">
+  //         <Skeleton className="h-4 w-3/5 mx-auto rounded" /> {/* Register link */}
+  //       </div>
+  //     </CardContent>
+  //   </Card>
+  // </div>
+  //   );
+  // }
+
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-      <Card className="w-full max-w-md shadow-xl animate-in fade-in-0 zoom-in-95 duration-300">
+      <Card className="w-full max-w-md shadow-xl animate-in fade-in-0 zoom-in-95 duration-500">
         <CardHeader className="p-6">
           <Link href="/login" className="absolute top-6 left-6 text-primary hover:opacity-80 transition-opacity md:top-10 md:left-10">
             <ArrowLeft size={24} />

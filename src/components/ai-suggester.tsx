@@ -70,17 +70,17 @@ export function AiSuggester() {
   return (
     <Card className="shadow-xl">
       <CardHeader className="text-center ">
-        <div className="flex justify-center items-center mb-2 animate-in fade-in-0 zoom-in-95 duration-300 delay-100">
+        <div className="flex justify-center items-center mb-2 animate-in fade-in-0 zoom-in-95 duration-500 delay-100">
           <BrainCircuit className="w-12 h-12 text-primary" />
         </div>
-        <CardTitle className="text-2xl animate-in fade-in-0 slide-in-from-top-2 duration-300 delay-200">Asesor IA de Artículos</CardTitle>
-        <CardDescription className="animate-in fade-in-0 slide-in-from-top-2 duration-300 delay-300">
+        <CardTitle className="text-2xl animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-200">Asesor IA de Artículos</CardTitle>
+        <CardDescription className="animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-300">
           Selecciona una infracción y nuestra IA te sugerirá artículos relevantes para entender mejor tus obligaciones y regulaciones.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-400">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-400">
             <FormField
               control={form.control}
               name="trafficInfraction"

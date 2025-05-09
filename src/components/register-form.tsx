@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, updateProfile, onAuthStateChanged, User } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, UserPlus, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const registerSchema = z.object({
   username: z.string().min(3, 'El nombre de usuario debe tener al menos 3 caracteres.'),
@@ -104,15 +105,47 @@ export function RegisterForm() {
   
   if (isCheckingAuth) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="p-6">
+            <Skeleton className="absolute top-6 left-6 md:top-10 md:left-10 h-6 w-6 rounded" /> {/* Back Arrow */}
+            <div className="flex flex-col items-center pt-8">
+              <Skeleton className="mb-6 h-[100px] w-[100px] rounded-full" /> {/* Icon container */}
+              <Skeleton className="h-9 w-3/5 mb-2 rounded" /> {/* Title */}
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/3 rounded" /> {/* Label */}
+                <Skeleton className="h-10 w-full rounded-md" /> {/* Input */}
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/3 rounded" /> {/* Label */}
+                <Skeleton className="h-10 w-full rounded-md" /> {/* Input */}
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/3 rounded" /> {/* Label */}
+                <Skeleton className="h-10 w-full rounded-md" /> {/* Input */}
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/3 rounded" /> {/* Label */}
+                <Skeleton className="h-10 w-full rounded-md" /> {/* Input */}
+              </div>
+              <Skeleton className="h-12 w-full rounded-md py-3 mt-6" /> {/* Register Button */}
+            </div>
+            <div className="mt-6 text-center">
+              <Skeleton className="h-4 w-2/5 mx-auto rounded" /> {/* Login link */}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
-       <Card className="w-full max-w-md shadow-xl animate-in fade-in-0 zoom-in-95 duration-300">
+       <Card className="w-full max-w-md shadow-xl animate-in fade-in-0 zoom-in-95 duration-500">
         <CardHeader className="p-6">
           <Link href="/login" className="absolute top-6 left-6 text-primary hover:opacity-80 transition-opacity md:top-10 md:left-10">
             <ArrowLeft size={24} />
