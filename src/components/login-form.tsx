@@ -82,7 +82,7 @@ export function LoginForm() {
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="p-6">
-            <Skeleton className="absolute top-6 left-6 h-6 w-6 rounded" /> {/* Back Arrow */}
+            <Skeleton className="absolute top-6 left-6 md:top-10 md:left-10 h-6 w-6 rounded" /> {/* Back Arrow */}
             <div className="flex flex-col items-center pt-8">
               <Skeleton className="mb-6 h-[100px] w-[100px] rounded-full" /> {/* Icon container */}
               <Skeleton className="h-9 w-3/5 mb-2 rounded" /> {/* Title */}
@@ -114,7 +114,7 @@ export function LoginForm() {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background">
       <Card className="w-full max-w-md shadow-xl animate-in fade-in-0 zoom-in-95 duration-500">
         <CardHeader className="p-6">
-          <Link href="/" className="absolute top-6 left-6 text-primary hover:opacity-80 transition-opacity">
+          <Link href="/" className="absolute top-6 left-6 text-primary hover:opacity-80 transition-opacity md:top-10 md:left-10">
             <ArrowLeft size={24} />
           </Link>
           <div className="flex flex-col items-center pt-8">
