@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link'; // Added for login button
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, Mail, Edit3, Camera, Loader2, Save, Trash2, LockKeyhole, ShieldAlert, LogOut } from 'lucide-react';
+import { User, Mail, Edit3, Camera, Loader2, Save, Trash2, LockKeyhole, ShieldAlert, LogOut, AlertCircle } from 'lucide-react'; // Added AlertCircle
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -93,7 +94,11 @@ export function UserProfileForm() {
           setFirestoreUser(userDocSnap.data() as FirestoreUser);
         }
       } else {
-        router.push('/login'); // Redirect if not logged in
+        // Instead of redirecting, allow page to load but with no user data
+        setCurrentUser(null);
+        setFirestoreUser(null);
+        profileForm.reset({ username: '', profileImageFile: undefined });
+        setImagePreviewUrl(null);
       }
       setIsLoading(false);
     });
@@ -149,7 +154,10 @@ export function UserProfileForm() {
   };
 
   async function onProfileSubmit(values: ProfileFormValues) {
-    if (!currentUser) return;
+    if (!currentUser) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión para actualizar tu perfil.' });
+        return;
+    }
     setIsUpdatingProfile(true);
 
     let newPhotoURL: string | null = currentUser.photoURL;
@@ -192,7 +200,8 @@ export function UserProfileForm() {
       
       setCurrentUser(auth.currentUser); 
       setFirestoreUser(prev => prev ? {...prev, username: values.username, photoURL: newPhotoURL} : null);
-      profileForm.reset({ username: values.username, profileImageFile: undefined });
+      profileForm.reset({ username: values.username, profileImageFile: undefined }, { keepDirty: false });
+
 
       toast({ title: 'Perfil actualizado', description: 'Tu información de perfil ha sido guardada.' });
     } catch (error) {
@@ -204,7 +213,10 @@ export function UserProfileForm() {
   }
 
   async function onPasswordChangeSubmit(values: PasswordChangeFormValues) {
-    if (!currentUser || !currentUser.email) return;
+    if (!currentUser || !currentUser.email) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión para cambiar tu contraseña.' });
+        return;
+    }
     setIsChangingPassword(true);
 
     try {
@@ -230,7 +242,10 @@ export function UserProfileForm() {
   }
 
   async function handleDeleteAccount() {
-    if (!currentUser || !currentUser.email) return;
+    if (!currentUser || !currentUser.email) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión para eliminar tu cuenta.' });
+        return;
+    }
     setIsDeletingAccount(true);
 
     try {
@@ -304,8 +319,31 @@ export function UserProfileForm() {
   }
 
   if (!currentUser) {
-    return <p>Cargando perfil...</p>; 
+    return (
+      <Card className="max-w-2xl mx-auto shadow-xl animate-in fade-in-0 zoom-in-95 duration-500">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+            <User size={28} /> Perfil de Usuario
+          </CardTitle>
+          <CardDescription>Administra la información de tu perfil y tu cuenta.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-10">
+          <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
+          <p className="text-lg font-medium mb-2">Acceso Restringido</p>
+          <p className="text-muted-foreground mb-6">
+            Debes iniciar sesión para ver y editar tu perfil.
+          </p>
+          <Link href="/login" passHref legacyBehavior>
+            <Button>
+              <LogOut className="mr-2 h-4 w-4" />
+              Iniciar Sesión
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    )
   }
+  
 
   return (
     <Card className="max-w-2xl mx-auto shadow-xl animate-in fade-in-0 zoom-in-95 duration-500">
@@ -540,3 +578,4 @@ export function UserProfileForm() {
     </Card>
   );
 }
+
