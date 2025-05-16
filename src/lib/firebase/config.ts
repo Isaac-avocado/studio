@@ -39,14 +39,15 @@ if (!getApps().length) {
 
 // Check if Firebase config is loaded
 if (
-    !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" ||
+    !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || // Common placeholder
     !firebaseConfig.authDomain ||
     !firebaseConfig.projectId
    ) {
   console.warn(
-    'Firebase configuration is missing or incomplete. Please check your .env file.'
+    'Firebase configuration is missing or incomplete. Please check your .env file or environment variables.'
   );
 }
 
 
 export { app, auth, db, storage };
+
