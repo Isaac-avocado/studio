@@ -18,6 +18,17 @@ let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
 
+// Comprobar si las variables de configuración de Firebase están cargadas
+if (
+    !firebaseConfig.apiKey || firebaseConfig.apiKey === "TU_API_KEY_AQUI" || // Placeholder común
+    !firebaseConfig.authDomain ||
+    !firebaseConfig.projectId
+   ) {
+  console.warn(
+    'La configuración de Firebase falta o está incompleta. Por favor, revisa tu archivo .env o las variables de entorno. Asegúrate de reemplazar los placeholders como "TU_API_KEY_AQUI" con tus valores reales.'
+  );
+}
+
 if (!getApps().length) {
   try {
     app = initializeApp(firebaseConfig);
@@ -25,10 +36,11 @@ if (!getApps().length) {
     db = getFirestore(app);
     storage = getStorage(app);
   } catch (error) {
-    console.error('Firebase initialization error', error);
-    // Fallback or throw error, depending on how critical Firebase is for the app to start
-    // For now, we'll let it proceed, but auth-dependent features will fail.
-    // A more robust solution would be to show an error page or prevent app load.
+    console.error('Error de inicialización de Firebase', error);
+    // Fallback o lanzar error, dependiendo de cuán crítico sea Firebase para que la app inicie
+    // Por ahora, permitiremos que proceda, pero las características dependientes de la autenticación fallarán.
+    // Una solución más robusta sería mostrar una página de error o prevenir la carga de la app.
+    // Si ves este error, verifica que tus variables de entorno de Firebase sean correctas.
   }
 } else {
   app = getApps()[0];
@@ -37,17 +49,4 @@ if (!getApps().length) {
   storage = getStorage(app);
 }
 
-// Check if Firebase config is loaded
-if (
-    !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY" || // Common placeholder
-    !firebaseConfig.authDomain ||
-    !firebaseConfig.projectId
-   ) {
-  console.warn(
-    'Firebase configuration is missing or incomplete. Please check your .env file or environment variables.'
-  );
-}
-
-
 export { app, auth, db, storage };
-
