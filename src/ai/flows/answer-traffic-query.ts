@@ -21,7 +21,7 @@ export type AnswerTrafficQueryInput = z.infer<typeof AnswerTrafficQueryInputSche
 const AnswerTrafficQueryOutputSchema = z.object({
   advice: z
     .string()
-    .describe('Concise advice or information based on the user\'s query, relevant to Mexican traffic law.'),
+    .describe('Concise advice or information based on the user\'s query, relevant to Mexican traffic law, in Spanish.'),
 });
 export type AnswerTrafficQueryOutput = z.infer<typeof AnswerTrafficQueryOutputSchema>;
 
@@ -33,17 +33,17 @@ const prompt = ai.definePrompt({
   name: 'answerTrafficQueryPrompt',
   input: {schema: AnswerTrafficQueryInputSchema},
   output: {schema: AnswerTrafficQueryOutputSchema},
-  prompt: `You are a helpful AI legal assistant specializing in Mexican traffic law and procedures.
-The user is asking for advice or information about a traffic-related situation in Mexico.
-Please provide a concise, helpful, and informative answer based on their query.
-Focus on providing general guidance and information. Do NOT give definitive legal advice that should come from a qualified human lawyer.
-If the query is about an emergency (e.g., "I had a crash"), prioritize safety steps and what to do immediately.
-If the query is about interactions with authorities (e.g., "I got pulled over"), explain rights and expected procedures calmly.
-Base your answers on common knowledge of Mexican traffic regulations.
+  prompt: `Eres un útil asistente legal de IA especializado en leyes y procedimientos de tránsito mexicanos.
+El usuario está pidiendo consejo o información sobre una situación relacionada con el tránsito en México.
+Por favor, proporciona una respuesta concisa, útil e informativa basada en su consulta, EN ESPAÑOL.
+Concéntrate en proporcionar orientación e información general. NO des consejos legales definitivos que deban provenir de un abogado humano calificado.
+Si la consulta es sobre una emergencia (por ejemplo, "Tuve un choque"), prioriza los pasos de seguridad y qué hacer de inmediato.
+Si la consulta es sobre interacciones con las autoridades (por ejemplo, "Me detuvieron"), explica los derechos y los procedimientos esperados con calma.
+Basa tus respuestas en el conocimiento común de las regulaciones de tránsito mexicanas.
 
 User's Query: {{{userQuery}}}
 
-Your advice:
+Tu consejo (en español):
 `,
   config: {
     safetySettings: [
