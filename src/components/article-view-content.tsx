@@ -1,3 +1,4 @@
+
 // src/components/article-view-content.tsx
 'use client';
 
@@ -18,20 +19,26 @@ interface ArticleViewContentProps {
 }
 
 export function ArticleViewContent({ article }: ArticleViewContentProps) {
-  const [isFavorite, setIsFavorite] = useState(false); // Assuming false initially, could be fetched
+  const [isFavorite, setIsFavorite] = useState(false); 
   const [favoriteCount, setFavoriteCount] = useState(article.favoriteCount);
   const { toast } = useToast();
 
   const handleFavoriteClick = () => {
-    setIsFavorite((prev) => {
-      const newFavoriteState = !prev;
-      setFavoriteCount((currentCount) => (newFavoriteState ? currentCount + 1 : currentCount - 1));
+    setIsFavorite((prevIsFavorite) => {
+      const newIsFavoriteState = !prevIsFavorite;
+      setFavoriteCount((prevFavoriteCount) => {
+        if (newIsFavoriteState) {
+          return prevFavoriteCount + 1;
+        } else {
+          return prevFavoriteCount - 1;
+        }
+      });
       // Here you would typically also call an API to update the favorite status and count on the backend
       toast({
-        title: newFavoriteState ? "Agregado a destacados" : "Eliminado de destacados",
-        description: `"${article.title}" ${newFavoriteState ? 'ahora está en tus destacados.' : 'ya no está en tus destacados.'}`,
+        title: newIsFavoriteState ? "Agregado a destacados" : "Eliminado de destacados",
+        description: `"${article.title}" ${newIsFavoriteState ? 'ahora está en tus destacados.' : 'ya no está en tus destacados.'}`,
       });
-      return newFavoriteState;
+      return newIsFavoriteState;
     });
   };
 

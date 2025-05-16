@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -19,12 +20,19 @@ export function ArticleCard({ article }: ArticleCardProps) {
   const [favoriteCount, setFavoriteCount] = useState(article.favoriteCount);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent link navigation if clicking on the favorite button area
-    e.stopPropagation(); // Prevent event bubbling to the card's Link
-    setIsFavorite((prev) => {
-      const newFavoriteState = !prev;
-      setFavoriteCount((currentCount) => newFavoriteState ? currentCount + 1 : currentCount - 1);
-      return newFavoriteState;
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    
+    setIsFavorite((prevIsFavorite) => {
+      const newIsFavoriteState = !prevIsFavorite;
+      setFavoriteCount((prevFavoriteCount) => {
+        if (newIsFavoriteState) {
+          return prevFavoriteCount + 1;
+        } else {
+          return prevFavoriteCount - 1;
+        }
+      });
+      return newIsFavoriteState;
     });
     // Here you would typically also call an API to update the favorite status and count on the backend
   };
