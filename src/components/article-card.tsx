@@ -87,3 +87,4 @@ export function ArticleCard({ article }: ArticleCardProps) {
     </Card>
   );
 }
+

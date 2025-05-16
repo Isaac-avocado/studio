@@ -23,7 +23,9 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
   const [favoriteCount, setFavoriteCount] = useState(article.favoriteCount);
   const { toast } = useToast();
 
-  const handleFavoriteClick = () => {
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsFavorite((prevIsFavorite) => {
       const newIsFavoriteState = !prevIsFavorite;
       setFavoriteCount((prevFavoriteCount) => {
@@ -144,3 +146,4 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
     </div>
   );
 }
+
