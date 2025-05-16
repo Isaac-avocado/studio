@@ -1,9 +1,9 @@
+
 // src/components/user-avatar-dropdown.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
@@ -63,12 +63,11 @@ export function UserAvatarDropdown() {
   }
 
   const getInitials = (name: string | null | undefined) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
+    if (!name) return 'U'; // Default fallback if name is unexpectedly missing
+    const nameParts = name.split(' ').filter(Boolean);
+    if (nameParts.length === 0) return 'U';
+    if (nameParts.length === 1) return nameParts[0][0].toUpperCase();
+    return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
   };
 
   return (
@@ -76,13 +75,9 @@ export function UserAvatarDropdown() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-9 w-9">
-            {currentUser.photoURL ? (
-              <AvatarImage src={currentUser.photoURL} alt={currentUser.displayName || 'Usuario'} />
-            ) : null}
+            <AvatarImage src={currentUser.photoURL || undefined} alt={currentUser.displayName || 'Usuario'} />
             <AvatarFallback className="bg-primary text-primary-foreground">
-              {currentUser.photoURL ? null : (
-                <User className="h-5 w-5" />
-              )}
+              {currentUser.displayName ? getInitials(currentUser.displayName) : <User className="h-5 w-5" />}
             </AvatarFallback>
           </Avatar>
         </Button>
