@@ -1,3 +1,4 @@
+
 // src/components/ai-suggester.tsx
 'use client';
 
@@ -10,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea'; // Changed from Select to Textarea
 import { Input } from '@/components/ui/input';
-import { BrainCircuit, HelpCircle, Loader2, Sparkles, Search as SearchIcon, MessageSquareQuestion } from 'lucide-react';
+import { BrainCircuit, HelpCircle, Loader2, Sparkles, Search as SearchIcon, MessageSquareQuote } from 'lucide-react'; // Changed MessageSquareQuestion to MessageSquareQuote
 import { answerTrafficQuery } from '@/ai/flows/answer-traffic-query'; // Updated import
 import { getAllArticles } from '@/lib/articles';
 import type { Article } from '@/types';
@@ -67,7 +68,7 @@ export function AiSuggester() {
     setIsLoading(true);
     setAiAdvice(null);
     setError(null);
-    setSearchQuery(''); 
+    setSearchQuery('');
     setLocalSearchResults([]);
 
     try {
@@ -97,14 +98,14 @@ export function AiSuggester() {
     setSearchQuery(e.target.value);
     if (aiAdvice) setAiAdvice(null);
     if (error) setError(null);
-    if (form.formState.isSubmitted) form.reset(); 
+    if (form.formState.isSubmitted) form.reset();
   };
 
   return (
     <Card className="shadow-xl">
       <CardHeader className="text-center ">
         <div className="flex justify-center items-center mb-2 animate-in fade-in-0 zoom-in-95 duration-500 delay-100">
-          <MessageSquareQuestion className="w-12 h-12 text-primary" />
+          <MessageSquareQuote className="w-12 h-12 text-primary" /> {/* Changed MessageSquareQuestion to MessageSquareQuote */}
         </div>
         <CardTitle className="text-2xl animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-200">Asesoría Vial con IA</CardTitle>
         <CardDescription className="animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-300">
@@ -192,7 +193,7 @@ export function AiSuggester() {
             />
           </div>
         </div>
-        
+
         {searchQuery && localSearchResults.length > 0 && (
           <div className="mt-8 animate-in fade-in-0 duration-500">
             <h3 className="text-lg font-semibold mb-3 text-primary">Resultados de Búsqueda Local:</h3>
