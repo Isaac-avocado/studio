@@ -7,31 +7,50 @@ import Link from 'next/link';
 import { TrafficCone, UserCog, ShieldCheck } from 'lucide-react';
 import { UserAvatarDropdown } from './user-avatar-dropdown';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config'; // Ensure db is imported
+import { doc, getDoc } from 'firebase/firestore'; // Ensure Firestore functions are imported
 import { Button } from '@/components/ui/button';
 
 export function AppHeader() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoadingClaims, setIsLoadingClaims] = useState(true);
+  const [isLoadingAdminCheck, setIsLoadingAdminCheck] = useState(true); // Changed from isLoadingClaims
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        setIsLoadingClaims(true);
+        console.log('[AppHeader] User authenticated:', user.uid);
+        setIsLoadingAdminCheck(true);
         try {
-          const idTokenResult = await user.getIdTokenResult(true); // Force refresh
-          setIsAdmin(idTokenResult.claims.admin === true);
+          // Fetch Firestore document to check for isAdmin (for test app admin setup)
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            console.log('[AppHeader] Firestore user data:', userData);
+            if (userData?.isAdmin === true) {
+              setIsAdmin(true);
+              console.log('[AppHeader] User is Admin based on Firestore.');
+            } else {
+              setIsAdmin(false);
+              console.log('[AppHeader] User is NOT Admin based on Firestore (isAdmin not true or missing).');
+            }
+          } else {
+            setIsAdmin(false);
+            console.log('[AppHeader] Firestore user document does not exist for UID:', user.uid);
+          }
         } catch (error) {
-          console.error("Error fetching user claims:", error);
+          console.error("[AppHeader] Error fetching user admin status from Firestore:", error);
           setIsAdmin(false);
         } finally {
-          setIsLoadingClaims(false);
+          setIsLoadingAdminCheck(false);
         }
       } else {
+        console.log('[AppHeader] No user authenticated.');
         setIsAdmin(false);
-        setIsLoadingClaims(false);
+        setIsLoadingAdminCheck(false);
       }
     });
     return () => unsubscribe();
@@ -45,7 +64,7 @@ export function AppHeader() {
             <TrafficCone size={28} />
             <h1 className="text-2xl font-bold">Mi Asesor Vial</h1>
           </Link>
-          {!isLoadingClaims && isAdmin && (
+          {!isLoadingAdminCheck && isAdmin && (
             <Link href="/dashboard/admin" passHref legacyBehavior>
               <Button variant="outline" size="sm" className="ml-4 border-accent text-accent hover:bg-accent/10 hover:text-accent">
                 <ShieldCheck className="mr-2 h-4 w-4" />
