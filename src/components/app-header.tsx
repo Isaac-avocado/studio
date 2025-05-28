@@ -7,46 +7,29 @@ import Link from 'next/link';
 import { TrafficCone, UserCog, ShieldCheck } from 'lucide-react';
 import { UserAvatarDropdown } from './user-avatar-dropdown';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase/config'; // Ensure db is imported
-import { doc, getDoc } from 'firebase/firestore'; // Ensure Firestore functions are imported
+import { auth } from '@/lib/firebase/config'; // db and Firestore functions no longer needed here for admin check
 import { Button } from '@/components/ui/button';
 
 export function AppHeader() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoadingAdminCheck, setIsLoadingAdminCheck] = useState(true); // Changed from isLoadingClaims
+  const [isLoadingAdminCheck, setIsLoadingAdminCheck] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        console.log('[AppHeader] User authenticated:', user.uid);
+        console.log('[AppHeader] User authenticated:', user.uid, user.email);
         setIsLoadingAdminCheck(true);
-        try {
-          // Fetch Firestore document to check for isAdmin (for test app admin setup)
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            console.log('[AppHeader] Firestore user data:', userData);
-            if (userData?.isAdmin === true) {
-              setIsAdmin(true);
-              console.log('[AppHeader] User is Admin based on Firestore.');
-            } else {
-              setIsAdmin(false);
-              console.log('[AppHeader] User is NOT Admin based on Firestore (isAdmin not true or missing).');
-            }
-          } else {
-            setIsAdmin(false);
-            console.log('[AppHeader] Firestore user document does not exist for UID:', user.uid);
-          }
-        } catch (error) {
-          console.error("[AppHeader] Error fetching user admin status from Firestore:", error);
+        // Admin check based on hardcoded email
+        if (user.email === 'admin@test.com') {
+          setIsAdmin(true);
+          console.log('[AppHeader] User is Admin based on email admin@test.com.');
+        } else {
           setIsAdmin(false);
-        } finally {
-          setIsLoadingAdminCheck(false);
+          console.log('[AppHeader] User is NOT Admin (email does not match admin@test.com).');
         }
+        setIsLoadingAdminCheck(false);
       } else {
         console.log('[AppHeader] No user authenticated.');
         setIsAdmin(false);

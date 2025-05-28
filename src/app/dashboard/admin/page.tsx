@@ -4,13 +4,14 @@
 
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase/config'; // Ensure db is imported
-import { doc, getDoc } from 'firebase/firestore'; // Ensure Firestore functions are imported
+import { auth } from '@/lib/firebase/config'; // db and Firestore functions no longer needed here for admin check
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, ShieldAlert, BarChart3, AlertTriangle, ExternalLink, ShieldCheck } from 'lucide-react'; // Added ShieldCheck
+import { Loader2, ShieldAlert, BarChart3, AlertTriangle, ExternalLink, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+
+const ADMIN_EMAIL = 'admin@test.com';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -21,36 +22,19 @@ export default function AdminPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        console.log('[AdminPage] User authenticated:', user.uid);
+        console.log('[AdminPage] User authenticated:', user.uid, user.email);
         setCurrentUser(user);
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            console.log('[AdminPage] Firestore user data:', userData);
-            if (userData?.isAdmin === true) {
-              setIsAdmin(true);
-              console.log('[AdminPage] User is Admin based on Firestore.');
-            } else {
-              setIsAdmin(false);
-              console.warn('[AdminPage] Access Denied: User is NOT Admin based on Firestore. Redirecting.');
-              setTimeout(() => router.push('/dashboard'), 100);
-            }
-          } else {
-            setIsAdmin(false);
-            console.warn('[AdminPage] Access Denied: Firestore user document does not exist. Redirecting.');
-            setTimeout(() => router.push('/dashboard'), 100);
-          }
-        } catch (error) {
-          console.error("[AdminPage] Error fetching user admin status for admin page:", error);
+        // Admin check based on hardcoded email
+        if (user.email === ADMIN_EMAIL) {
+          setIsAdmin(true);
+          console.log('[AdminPage] User is Admin based on email admin@test.com.');
+        } else {
           setIsAdmin(false);
+          console.warn(`[AdminPage] Access Denied: User email ${user.email} does NOT match ${ADMIN_EMAIL}. Redirecting.`);
           setTimeout(() => router.push('/dashboard'), 100);
         }
       } else {
         console.log('[AdminPage] No user authenticated. Redirecting to login.');
-        // No user logged in, redirect to login
         router.push('/login');
       }
       setIsLoading(false);
@@ -68,7 +52,6 @@ export default function AdminPage() {
   }
 
   if (!isAdmin) {
-    // This state might be briefly visible before redirect or if redirect fails
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
@@ -93,9 +76,9 @@ export default function AdminPage() {
             <ShieldCheck size={32} /> Panel de Administración
           </CardTitle>
           <CardDescription>
-            Bienvenido, {currentUser?.displayName || 'Admin'}. Aquí puedes ver información general de la aplicación.
+            Bienvenido, {currentUser?.displayName || currentUser?.email || 'Admin'}. Aquí puedes ver información general de la aplicación.
             <br />
-            <span className="text-xs text-amber-600 dark:text-amber-400">Nota: En esta versión de prueba, el estado de administrador se gestiona mediante un campo 'isAdmin: true' en el documento del usuario en Firestore.</span>
+            <span className="text-xs text-amber-600 dark:text-amber-400">Nota: En esta versión de prueba, el estado de administrador se otorga al usuario con el correo electrónico: <strong>{ADMIN_EMAIL}</strong>.</span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -126,7 +109,6 @@ export default function AdminPage() {
                   ) : (
                     <p className="text-sm text-red-500">PROJECT_ID de Firebase no configurado para el enlace de Analytics.</p>
                   )}
-
                 </div>
               </div>
             </div>
