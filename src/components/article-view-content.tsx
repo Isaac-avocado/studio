@@ -10,47 +10,92 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, BookOpen, Link2, Tag, Heart, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { rtdb } from '@/lib/firebase/config'; // Import RTDB
+import { ref, onValue, runTransaction, off } from 'firebase/database'; // Import RTDB functions
 
 interface ArticleViewContentProps {
   article: Article;
 }
 
 export function ArticleViewContent({ article }: ArticleViewContentProps) {
-  const [isFavorite, setIsFavorite] = useState(false); 
-  const [favoriteCount, setFavoriteCount] = useState(article.favoriteCount);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [rtdbFavoriteCount, setRtdbFavoriteCount] = useState<number>(article.favoriteCount);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const favCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
+    const listener = onValue(favCountRef, (snapshot) => {
+      const count = snapshot.val();
+      if (count !== null) {
+        setRtdbFavoriteCount(count);
+      } else {
+        setRtdbFavoriteCount(article.favoriteCount);
+      }
+    });
+    return () => {
+      off(favCountRef, 'value', listener);
+    };
+  }, [article.slug, article.favoriteCount]);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsFavorite((prevIsFavorite) => {
-      const newIsFavoriteState = !prevIsFavorite;
-      setFavoriteCount((prevFavoriteCount) => {
-        if (newIsFavoriteState) {
-          return prevFavoriteCount + 1;
-        } else {
-          return prevFavoriteCount - 1;
-        }
-      });
-      // Here you would typically also call an API to update the favorite status and count on the backend
+
+    const newIsFavoriteState = !isFavorite;
+    setIsFavorite(newIsFavoriteState);
+
+    toast({
+      title: newIsFavoriteState ? "Agregado a destacados" : "Eliminado de destacados",
+      description: `"${article.title}" ${newIsFavoriteState ? 'ahora está en tus destacados.' : 'ya no está en tus destacados.'}`,
+    });
+    
+    const articleFavCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
+    runTransaction(articleFavCountRef, (currentCount) => {
+      if (currentCount === null) {
+        return newIsFavoriteState ? Math.max(1, article.favoriteCount + 1) : Math.max(0, article.favoriteCount);
+      }
+      if (newIsFavoriteState) {
+        return currentCount + 1;
+      } else {
+        return Math.max(0, currentCount - 1);
+      }
+    }).catch(error => {
+      console.error("Transaction failed: ", error);
+      setIsFavorite(!newIsFavoriteState); // Revert optimistic update
       toast({
-        title: newIsFavoriteState ? "Agregado a destacados" : "Eliminado de destacados",
-        description: `"${article.title}" ${newIsFavoriteState ? 'ahora está en tus destacados.' : 'ya no está en tus destacados.'}`,
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo actualizar el contador de favoritos.",
       });
-      return newIsFavoriteState;
     });
   };
 
   const handleShareClick = () => {
-    // Placeholder for share functionality
-    // In a real app, you might use navigator.share if available, or copy link to clipboard
-    toast({
-      title: "Compartir Artículo",
-      description: "Funcionalidad de compartir estará disponible pronto.",
-    });
+    if (navigator.share) {
+      navigator.share({
+        title: article.title,
+        text: article.shortDescription,
+        url: window.location.href,
+      }).then(() => {
+        toast({ title: "Artículo compartido", description: "Gracias por compartir." });
+      }).catch((error) => {
+        console.error('Error al compartir:', error);
+        // Fallback para copiar al portapapeles si navigator.share falla o no está disponible
+        navigator.clipboard.writeText(window.location.href).then(() => {
+          toast({ title: "Enlace copiado", description: "El enlace al artículo ha sido copiado a tu portapapeles." });
+        });
+      });
+    } else {
+      // Fallback para navegadores que no soportan navigator.share
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        toast({ title: "Enlace copiado", description: "El enlace al artículo ha sido copiado a tu portapapeles." });
+      }).catch(err => {
+         toast({ variant: "destructive", title: "Error", description: "No se pudo copiar el enlace." });
+      });
+    }
   };
 
   return (
@@ -100,7 +145,7 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
             </Badge>
             <div className="flex items-center text-sm text-muted-foreground">
               <Heart className={cn("h-4 w-4 mr-1", isFavorite ? "fill-destructive text-destructive" : "text-gray-400")} />
-              <span>{favoriteCount}</span>
+              <span>{rtdbFavoriteCount}</span>
             </div>
           </div>
 
@@ -146,4 +191,3 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
     </div>
   );
 }
-

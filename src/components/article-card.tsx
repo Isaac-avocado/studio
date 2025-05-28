@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Tag, Heart } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { rtdb } from '@/lib/firebase/config'; // Import RTDB
+import { ref, onValue, runTransaction, off } from 'firebase/database'; // Import RTDB functions
 
 interface ArticleCardProps {
   article: Article;
@@ -17,24 +19,50 @@ interface ArticleCardProps {
 
 export function ArticleCard({ article }: ArticleCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteCount, setFavoriteCount] = useState(article.favoriteCount);
+  // Favorite count will now come from RTDB, initialize with article's static count as fallback
+  const [rtdbFavoriteCount, setRtdbFavoriteCount] = useState<number>(article.favoriteCount);
+
+  useEffect(() => {
+    const favCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
+    const listener = onValue(favCountRef, (snapshot) => {
+      const count = snapshot.val();
+      if (count !== null) {
+        setRtdbFavoriteCount(count);
+      } else {
+        // If no value in RTDB, use the static one (or 0 if you prefer)
+        setRtdbFavoriteCount(article.favoriteCount);
+      }
+    });
+
+    // Clean up the listener when the component unmounts
+    return () => {
+      off(favCountRef, 'value', listener);
+    };
+  }, [article.slug, article.favoriteCount]);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
-    e.preventDefault(); 
-    e.stopPropagation(); 
-    
-    setIsFavorite((prevIsFavorite) => {
-      const newIsFavoriteState = !prevIsFavorite;
-      setFavoriteCount((prevFavoriteCount) => {
-        if (newIsFavoriteState) {
-          return prevFavoriteCount + 1;
-        } else {
-          return prevFavoriteCount - 1;
-        }
-      });
-      return newIsFavoriteState;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const newIsFavoriteState = !isFavorite;
+    setIsFavorite(newIsFavoriteState);
+
+    const articleFavCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
+    runTransaction(articleFavCountRef, (currentCount) => {
+      if (currentCount === null) {
+        // Initialize if not present, ensuring it's at least 0
+        return newIsFavoriteState ? Math.max(1, article.favoriteCount + 1) : Math.max(0, article.favoriteCount);
+      }
+      if (newIsFavoriteState) {
+        return currentCount + 1;
+      } else {
+        return Math.max(0, currentCount - 1); // Ensure count doesn't go below 0
+      }
+    }).catch(error => {
+      console.error("Transaction failed: ", error);
+      // Optionally revert UI state or show toast
+      setIsFavorite(!newIsFavoriteState); // Revert optimistic update
     });
-    // Here you would typically also call an API to update the favorite status and count on the backend
   };
 
   return (
@@ -66,7 +94,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
           </Badge>
           <div className="flex items-center text-sm text-muted-foreground">
             <Heart className={cn("h-4 w-4 mr-1", isFavorite ? "fill-destructive text-destructive" : "text-gray-400")} />
-            <span>{favoriteCount}</span>
+            <span>{rtdbFavoriteCount}</span>
           </div>
         </div>
         <CardTitle className="text-xl mb-2 line-clamp-2">{article.title}</CardTitle>
@@ -87,4 +115,3 @@ export function ArticleCard({ article }: ArticleCardProps) {
     </Card>
   );
 }
-
