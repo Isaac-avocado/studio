@@ -1,4 +1,5 @@
 
+// src/components/article-card.tsx
 'use client';
 
 import Image from 'next/image';
@@ -7,20 +8,27 @@ import type { Article } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Tag, Heart } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ExternalLink, Tag, Heart, MoreVertical, Edit, Send, EyeOff, Trash2, Loader2 } from 'lucide-react'; // EyeOff para ocultar
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { rtdb } from '@/lib/firebase/config'; // Import RTDB
-import { ref, onValue, runTransaction, off } from 'firebase/database'; // Import RTDB functions
+import { rtdb } from '@/lib/firebase/config';
+import { ref, onValue, runTransaction, off } from 'firebase/database';
+import { useToast } from '@/hooks/use-toast';
 
 interface ArticleCardProps {
   article: Article;
+  isAdmin?: boolean;
+  onEdit?: (article: Article) => void;
+  onDelete?: (article: Article) => void;
+  onTogglePublish?: (article: Article) => void;
 }
 
-export function ArticleCard({ article }: ArticleCardProps) {
+export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogglePublish }: ArticleCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
-  // Favorite count will now come from RTDB, initialize with article's static count as fallback
-  const [rtdbFavoriteCount, setRtdbFavoriteCount] = useState<number>(article.favoriteCount);
+  const [rtdbFavoriteCount, setRtdbFavoriteCount] = useState<number>(article.favoriteCount || 0);
+  const [isProcessingAdminAction, setIsProcessingAdminAction] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const favCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
@@ -29,12 +37,9 @@ export function ArticleCard({ article }: ArticleCardProps) {
       if (count !== null) {
         setRtdbFavoriteCount(count);
       } else {
-        // If no value in RTDB, use the static one (or 0 if you prefer)
-        setRtdbFavoriteCount(article.favoriteCount);
+        setRtdbFavoriteCount(article.favoriteCount || 0);
       }
     });
-
-    // Clean up the listener when the component unmounts
     return () => {
       off(favCountRef, 'value', listener);
     };
@@ -43,51 +48,106 @@ export function ArticleCard({ article }: ArticleCardProps) {
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isProcessingAdminAction) return; // Evitar interacción si se está procesando otra acción
 
     const newIsFavoriteState = !isFavorite;
     setIsFavorite(newIsFavoriteState);
 
     const articleFavCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
     runTransaction(articleFavCountRef, (currentCount) => {
+      const initialCount = article.favoriteCount || 0;
       if (currentCount === null) {
-        // Initialize if not present, ensuring it's at least 0
-        return newIsFavoriteState ? Math.max(1, article.favoriteCount + 1) : Math.max(0, article.favoriteCount);
+        return newIsFavoriteState ? Math.max(1, initialCount + 1) : Math.max(0, initialCount);
       }
       if (newIsFavoriteState) {
         return currentCount + 1;
       } else {
-        return Math.max(0, currentCount - 1); // Ensure count doesn't go below 0
+        return Math.max(0, currentCount - 1);
       }
     }).catch(error => {
       console.error("Transaction failed: ", error);
-      // Optionally revert UI state or show toast
-      setIsFavorite(!newIsFavoriteState); // Revert optimistic update
+      setIsFavorite(!newIsFavoriteState);
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el contador de Me Gusta." });
     });
   };
 
+  const handleAdminAction = async (action: 'edit' | 'delete' | 'togglePublish') => {
+    setIsProcessingAdminAction(true);
+    try {
+      if (action === 'edit' && onEdit) onEdit(article);
+      if (action === 'delete' && onDelete) onDelete(article); // La confirmación se maneja en DashboardPage
+      if (action === 'togglePublish' && onTogglePublish) await onTogglePublish(article);
+    } catch (error) {
+        toast({ variant: "destructive", title: "Error de Admin", description: `No se pudo realizar la acción: ${action}` });
+    } finally {
+        // No resetear isProcessingAdminAction aquí si la acción principal (como abrir dialog)
+        // debe mantener el control, o si el componente se desmonta.
+        // Considerar resetearlo desde el componente padre si es necesario.
+        // Por ahora, para acciones rápidas como togglePublish lo reseteamos.
+        if (action === 'togglePublish') setIsProcessingAdminAction(false);
+    }
+  };
+  
+  const isDraftByAdmin = isAdmin && article.status === 'draft';
+
   return (
-    <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
+    <Card className={cn(
+        "overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col h-full",
+        isDraftByAdmin && "opacity-70 grayscale hover:opacity-90 hover:grayscale-0",
+        isProcessingAdminAction && "cursor-not-allowed opacity-60"
+      )}>
       <CardHeader className="p-0 relative">
         <div className="relative w-full h-48">
           <Image
-            src={article.imageUrl}
+            src={article.imageUrl || 'https://placehold.co/600x400.png?text=Art%C3%ADculo'}
             alt={article.title}
             layout="fill"
             objectFit="cover"
-            data-ai-hint={article.imageHint}
+            data-ai-hint={article.imageHint || 'article image'}
+            className={cn(isProcessingAdminAction && "opacity-50")}
           />
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-2 right-2 bg-background/70 hover:bg-background/90 text-destructive hover:text-destructive rounded-full h-9 w-9"
-          onClick={handleFavoriteClick}
-          aria-label={isFavorite ? "Quitar de destacados" : "Marcar como destacado"}
-        >
-          <Heart className={cn("h-5 w-5", isFavorite && "fill-destructive")} />
-        </Button>
+        <div className="absolute top-2 right-2 flex gap-2">
+            <Button
+                variant="ghost"
+                size="icon"
+                className="bg-background/70 hover:bg-background/90 text-destructive hover:text-destructive rounded-full h-9 w-9"
+                onClick={handleFavoriteClick}
+                aria-label={isFavorite ? "Quitar de destacados" : "Marcar como destacado"}
+                disabled={isProcessingAdminAction}
+            >
+                <Heart className={cn("h-5 w-5", isFavorite && "fill-destructive")} />
+            </Button>
+            {isAdmin && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={isProcessingAdminAction}>
+                        <Button variant="ghost" size="icon" className="bg-background/70 hover:bg-background/90 rounded-full h-9 w-9">
+                            {isProcessingAdminAction ? <Loader2 className="h-5 w-5 animate-spin" /> : <MoreVertical className="h-5 w-5" />}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleAdminAction('edit')} disabled={isProcessingAdminAction}>
+                            <Edit className="mr-2 h-4 w-4" /> Actualizar
+                        </DropdownMenuItem>
+                        {article.status === 'published' ? (
+                            <DropdownMenuItem onClick={() => handleAdminAction('togglePublish')} disabled={isProcessingAdminAction}>
+                                <EyeOff className="mr-2 h-4 w-4" /> Ocultar (Borrador)
+                            </DropdownMenuItem>
+                        ) : (
+                            <DropdownMenuItem onClick={() => handleAdminAction('togglePublish')} disabled={isProcessingAdminAction}>
+                                <Send className="mr-2 h-4 w-4" /> Publicar
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleAdminAction('delete')} className="text-destructive focus:text-destructive" disabled={isProcessingAdminAction}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+        </div>
       </CardHeader>
-      <CardContent className="p-6 flex-grow">
+      <CardContent className={cn("p-6 flex-grow", isProcessingAdminAction && "opacity-50")}>
         <div className="mb-2 flex justify-between items-center">
           <Badge variant="secondary" className="flex items-center gap-1 w-fit">
             <Tag size={14} /> {article.category}
@@ -101,10 +161,11 @@ export function ArticleCard({ article }: ArticleCardProps) {
         <CardDescription className="line-clamp-3 text-sm">
           {article.shortDescription}
         </CardDescription>
+        {isDraftByAdmin && <Badge variant="outline" className="mt-2 border-amber-500 text-amber-600">Borrador</Badge>}
       </CardContent>
-      <CardFooter className="p-6 pt-0">
+      <CardFooter className={cn("p-6 pt-0", isProcessingAdminAction && "opacity-50")}>
         <Link href={`/dashboard/article/${article.slug}`} passHref legacyBehavior>
-          <Button asChild className="w-full">
+          <Button asChild className="w-full" disabled={isProcessingAdminAction || isDraftByAdmin}>
             <a>
               Ver Detalles
               <ExternalLink className="ml-2 h-4 w-4" />

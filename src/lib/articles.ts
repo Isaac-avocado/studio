@@ -1,7 +1,19 @@
-import type { Article, TrafficInfraction } from '@/types';
 
-const articles: Article[] = [
+import type { Article, TrafficInfraction, Category } from '@/types';
+
+// Lista inicial de categorías. Idealmente, esto vendría de Firestore.
+export const initialCategories: Category[] = [
+  { id: 'reglamentos-infracciones', name: 'Reglamentos e Infracciones' },
+  { id: 'seguridad-vial', name: 'Seguridad Vial' },
+  { id: 'obligaciones', name: 'Obligaciones' },
+  { id: 'infracciones-graves', name: 'Infracciones Graves' },
+  { id: 'consejos-generales', name: 'Consejos Generales' },
+];
+
+
+const articlesData: Article[] = [
   {
+    id: '1',
     slug: 'entendiendo-limites-velocidad',
     title: 'Entendiendo los Límites de Velocidad y sus Consecuencias',
     shortDescription: 'Conoce los diferentes límites de velocidad y las posibles multas por excederlos.',
@@ -20,8 +32,12 @@ const articles: Article[] = [
     },
     readMoreLink: '#',
     favoriteCount: 120,
+    status: 'published',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
+    id: '2',
     slug: 'importancia-semaforos',
     title: 'La Importancia de las Señales del Semáforo',
     shortDescription: 'Descubre por qué los semáforos son esenciales para un flujo vehicular ordenado y para prevenir choques.',
@@ -40,8 +56,12 @@ const articles: Article[] = [
     },
     readMoreLink: '#',
     favoriteCount: 95,
+    status: 'published',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
+    id: '3',
     slug: 'practicas-estacionamiento-seguro',
     title: 'Prácticas de Estacionamiento Seguro para Evitar Multas',
     shortDescription: 'Domina las reglas de estacionamiento seguro y legal para evitar infracciones y garantizar la accesibilidad.',
@@ -60,12 +80,16 @@ const articles: Article[] = [
     },
     readMoreLink: '#',
     favoriteCount: 78,
+    status: 'published',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
+    id: '4',
     slug: 'riesgos-manejar-influencia',
     title: 'Riesgos de Manejar Bajo la Influencia (DUI)',
     shortDescription: 'Comprende los graves peligros y las repercusiones legales de manejar bajo la influencia del alcohol o drogas.',
-    category: 'Infracciones',
+    category: 'Infracciones Graves', // Cambiado para usar una de las initialCategories
     imageUrl: 'https://picsum.photos/seed/dui/600/400',
     imageHint: 'peligro volante',
     content: {
@@ -81,16 +105,58 @@ const articles: Article[] = [
     },
     readMoreLink: '#',
     favoriteCount: 150,
+    status: 'published',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '5',
+    slug: 'articulo-borrador-ejemplo',
+    title: 'Ejemplo de Artículo en Borrador (Solo Admin)',
+    shortDescription: 'Este es un artículo de ejemplo que está en estado de borrador y solo debería ser visible para administradores.',
+    category: 'Consejos Generales',
+    imageUrl: 'https://picsum.photos/seed/draft/600/400',
+    imageHint: 'documento borrador',
+    content: {
+      introduction: 'Este artículo sirve como demostración de cómo se verían los artículos en borrador en la sección de administración.',
+      points: [
+        'Los borradores no son visibles para usuarios regulares.',
+        'Los administradores pueden editarlos y publicarlos.',
+        'Este es un punto de prueba.',
+      ],
+      conclusion: 'Próximamente más contenido aquí.',
+    },
+    readMoreLink: '#',
+    favoriteCount: 5,
+    status: 'draft', // Este es un borrador
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
 ];
 
+// TODO: Reemplazar esto con llamadas a Firestore
 export const getAllArticles = (): Article[] => {
-  return articles;
+  // En un futuro, esto obtendría artículos de Firestore.
+  // Por ahora, para el dashboard de admin, podríamos filtrar por status.
+  return articlesData;
+};
+
+export const getPublishedArticles = (): Article[] => {
+  return articlesData.filter(article => article.status === 'published');
+};
+
+export const getDraftArticles = (): Article[] => {
+  return articlesData.filter(article => article.status === 'draft');
 };
 
 export const getArticleBySlug = (slug: string): Article | undefined => {
-  return articles.find((article) => article.slug === slug);
+  // Esto también necesitaría buscar en Firestore
+  return articlesData.find((article) => article.slug === slug);
 };
+
+export const getCategories = (): Category[] => {
+    return initialCategories;
+}
 
 export const commonTrafficInfractions: TrafficInfraction[] = [
   { id: 'speeding', name: 'Exceso de velocidad' },
