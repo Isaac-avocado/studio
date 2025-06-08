@@ -1,12 +1,11 @@
-
 // src/app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getPublishedArticles, getDraftArticles, getCategories } from '@/lib/articles'; // Actualizado
+import { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import { getPublishedArticles, getDraftArticles, getCategories, saveArticleToFirestore, deleteArticleFromFirestore } from '@/lib/articles'; // Actualizado
 import { ArticleCard } from '@/components/article-card';
 import { AiSuggester } from '@/components/ai-suggester';
-import { Newspaper, Lightbulb, PlusCircle, Archive, Edit, Send, Trash2, ShieldAlert } from 'lucide-react';
+import { Newspaper, Lightbulb, PlusCircle, Archive, Edit, Send, Trash2, ShieldAlert, Loader2 } from 'lucide-react'; // Added Loader2
 import { Button } from '@/components/ui/button';
 import { ArticleFormDialog } from '@/components/article-form-dialog'; // Nuevo
 import type { Article, Category } from '@/types';
@@ -21,50 +20,6 @@ import { Separator } from '@/components/ui/separator';
 //   description: 'Explora artículos sobre seguridad vial y obtén consejos de nuestra IA.',
 // };
 
-
-// Mock/Placeholder functions for Firestore operations
-// En una implementación real, estas interactuarían con Firestore
-const saveArticleToFirestore = async (articleData: any, status: 'draft' | 'published', existingArticleId?: string): Promise<Article> => {
-  console.log(`Simulando ${existingArticleId ? 'actualización' : 'guardado'} de artículo ${status}:`, articleData);
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Simular delay de red
-  
-  // Esto es solo una simulación. Necesitarías una lógica real aquí.
-  const newId = existingArticleId || Date.now().toString();
-  const slug = articleData.title.toLowerCase().replace(/\s+/g, '-').slice(0, 50);
-  
-  const newArticle: Article = {
-    id: newId,
-    slug: slug,
-    title: articleData.title,
-    shortDescription: articleData.shortDescription,
-    category: getCategories().find(c => c.id === articleData.category)?.name || articleData.category,
-    imageUrl: articleData.imageUrl || (articleData.imageFile ? 'https://placehold.co/600x400.png?text=Subida' : 'https://placehold.co/600x400.png?text=Sin+Imagen'),
-    imageHint: 'custom article',
-    content: {
-      introduction: articleData.introduction,
-      points: articleData.points.split('\n').filter((p:string) => p.trim() !== ''),
-      conclusion: articleData.conclusion,
-    },
-    favoriteCount: 0,
-    status: status,
-    authorId: auth.currentUser?.uid,
-    createdAt: existingArticleId ? (getPublishedArticles().find(a => a.id === existingArticleId)?.createdAt || new Date()) : new Date(),
-    updatedAt: new Date(),
-  };
-  
-  // Aquí actualizarías tu estado local o re-fetchearías para ver los cambios.
-  // Esta simulación NO actualiza la UI automáticamente.
-  return newArticle;
-};
-
-const deleteArticleFromFirestore = async (articleId: string) => {
-  console.log('Simulando eliminación de artículo:', articleId);
-  await new Promise(resolve => setTimeout(resolve, 500));
-  // Aquí actualizarías tu estado local o re-fetchearías.
-  return true;
-};
-
-
 export default function DashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -72,28 +27,38 @@ export default function DashboardPage() {
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const { toast } = useToast();
 
-  // Estas listas se deberían cargar desde Firestore en una app real
-  const [publishedArticles, setPublishedArticles] = useState<Article[]>(getPublishedArticles());
-  const [draftArticles, setDraftArticles] = useState<Article[]>(getDraftArticles());
-  
+  const [publishedArticles, setPublishedArticles] = useState<Article[]>([]);
+  const [draftArticles, setDraftArticles] = useState<Article[]>([]);
+
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Helper function to fetch articles
+  const fetchArticles = useCallback(async () => { // Wrapped in useCallback
+    try {
+      const published = await getPublishedArticles();
+      const drafts = await getDraftArticles();
+      setPublishedArticles(published);
+      setDraftArticles(drafts);
+    } catch (error) {
+      console.error("Error fetching articles:", error);
+      // Optionally handle error, e.g., set articles to empty arrays or show a toast
+    }
+  }, []); // Empty dependency array means this function is created once
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user && user.email === 'admin@test.com') {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);
       }
-      // Cargar artículos aquí si vinieran de Firestore y dependieran del usuario/admin
-      setPublishedArticles(getPublishedArticles());
-      setDraftArticles(getDraftArticles());
+      fetchArticles(); // Fetch articles on auth state change
     });
+
     return () => unsubscribe();
-  }, []);
+  }, [fetchArticles]); // Add fetchArticles to dependency array
 
   const handleOpenArticleForm = (article?: Article) => {
     setEditingArticle(article || null);
@@ -109,32 +74,14 @@ export default function DashboardPage() {
       });
       setIsArticleFormOpen(false);
       setEditingArticle(null);
-      // Actualizar listas (simulación, en real se re-fetchearía o actualizaría estado)
-      // Esta es una forma muy básica de actualizar, puede no ser la ideal para producción.
-      if (status === 'published') {
-        setPublishedArticles(prev => {
-          const existing = prev.find(a => a.id === savedArticle.id);
-          if (existing) return prev.map(a => a.id === savedArticle.id ? savedArticle : a);
-          return [...prev, savedArticle];
-        });
-        setDraftArticles(prev => prev.filter(a => a.id !== savedArticle.id));
-      } else { // draft
-        setDraftArticles(prev => {
-          const existing = prev.find(a => a.id === savedArticle.id);
-          if (existing) return prev.map(a => a.id === savedArticle.id ? savedArticle : a);
-          return [...prev, savedArticle];
-        });
-         if (editingArticle) { // si estaba editando un publicado y lo guardo como borrador
-            setPublishedArticles(prev => prev.filter(a => a.id !== savedArticle.id));
-         }
-      }
+      fetchArticles(); // Re-fetch articles after saving
 
     } catch (error) {
-      // El toast de error se maneja en el ArticleFormDialog o aquí si es necesario
       console.error("Error en handleSaveArticle:", error);
+      toast({ variant: "destructive", title: "Error al guardar artículo", description: "No se pudo guardar el artículo." });
     }
   };
-  
+
   const handleDeleteConfirmation = (article: Article) => {
     setArticleToDelete(article);
   };
@@ -144,53 +91,48 @@ export default function DashboardPage() {
     setIsDeleting(true);
     try {
       await deleteArticleFromFirestore(articleToDelete.id);
-      toast({ title: "Artículo eliminado", description: `"${articleToDelete.title}" ha sido eliminado.`});
-      if (articleToDelete.status === 'published') {
-        setPublishedArticles(prev => prev.filter(a => a.id !== articleToDelete.id));
-      } else {
-        setDraftArticles(prev => prev.filter(a => a.id !== articleToDelete.id));
-      }
+      toast({ title: "Artículo eliminado", description: `"${articleToDelete.title}" ha sido eliminado.` });
+      fetchArticles(); // Re-fetch articles after deleting
+
       setArticleToDelete(null);
     } catch (error) {
+      console.error("Error en handleConfirmDelete:", error);
       toast({ variant: "destructive", title: "Error al eliminar", description: "No se pudo eliminar el artículo." });
     } finally {
       setIsDeleting(false);
     }
   };
-  
+
   const handleTogglePublishStatus = async (article: Article) => {
     const newStatus = article.status === 'published' ? 'draft' : 'published';
     try {
-      // Simula la actualización en backend
-      const updatedArticle = await saveArticleToFirestore(
-        { // Necesitamos pasar los datos del artículo como si vinieran del formulario
+      // We need to pass the full article data to saveArticleToFirestore
+      // as if it came from the form, because saveArticleToFirestore now
+      // handles creating/updating the full document.
+      const articleDataToSave = {
           title: article.title,
           shortDescription: article.shortDescription,
+          // Find the category ID based on the name if necessary, or store ID directly
           category: getCategories().find(c => c.name === article.category)?.id || article.category,
           imageUrl: article.imageUrl,
+          // Assuming content.points is an array, join it back for the function expecting a string
           introduction: article.content.introduction,
-          points: article.content.points.join('\n'),
+          points: Array.isArray(article.content.points) ? article.content.points.join('\n') : '',
           conclusion: article.content.conclusion,
-        },
+      };
+
+      await saveArticleToFirestore(
+        articleDataToSave,
         newStatus,
         article.id
       );
-      
-      toast({
-        title: `Artículo ${newStatus === 'published' ? 'publicado' : 'movido a borradores'}`,
-        description: `"${updatedArticle.title}" ahora está ${newStatus === 'published' ? 'público' : 'en borradores'}.`,
-      });
 
-      // Actualizar estado local
-      if (newStatus === 'published') {
-        setPublishedArticles(prev => [...prev.filter(a=>a.id !== updatedArticle.id), updatedArticle]);
-        setDraftArticles(prev => prev.filter(a => a.id !== updatedArticle.id));
-      } else { // draft
-        setDraftArticles(prev => [...prev.filter(a=>a.id !== updatedArticle.id), updatedArticle]);
-        setPublishedArticles(prev => prev.filter(a => a.id !== updatedArticle.id));
-      }
+      toast({ title: `Artículo ${newStatus === 'published' ? 'publicado' : 'movido a borradores'}`, description: `"${article.title}" ahora está ${newStatus === 'published' ? 'público' : 'en borradores'}.` });
+
+      fetchArticles(); // Re-fetch articles after status change
 
     } catch (error) {
+      console.error("Error en handleTogglePublishStatus:", error);
       toast({ variant: "destructive", title: "Error al actualizar estado", description: "No se pudo cambiar el estado del artículo." });
     }
   };
@@ -219,9 +161,9 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
                     {draftArticles.map((article, index) => (
                         <div key={article.id || article.slug} className="animate-in fade-in-0 slide-in-from-bottom-5 duration-500" style={{ animationDelay: `${index * 100}ms` }}>
-                        <ArticleCard 
-                            article={article} 
-                            isAdmin={isAdmin} 
+                        <ArticleCard
+                            article={article}
+                            isAdmin={isAdmin}
                             onEdit={() => handleOpenArticleForm(article)}
                             onDelete={() => handleDeleteConfirmation(article)}
                             onTogglePublish={() => handleTogglePublishStatus(article)}
@@ -254,8 +196,8 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ">
               {publishedArticles.map((article, index) => (
                 <div key={article.id || article.slug} className="animate-in fade-in-0 slide-in-from-bottom-5 duration-500" style={{ animationDelay: `${300 + index * 100}ms` }}>
-                  <ArticleCard 
-                    article={article} 
+                  <ArticleCard
+                    article={article}
                     isAdmin={isAdmin}
                     onEdit={() => handleOpenArticleForm(article)}
                     onDelete={() => handleDeleteConfirmation(article)}

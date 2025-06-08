@@ -1,5 +1,7 @@
-
 import type { Article, TrafficInfraction, Category } from '@/types';
+import { db, storage } from '@/lib/firebase/config';
+import { collection, getDocs, query, where, getDoc, doc, updateDoc, arrayUnion, arrayRemove, DocumentData, runTransaction, addDoc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // Lista inicial de categorías. Idealmente, esto vendría de Firestore.
 export const initialCategories: Category[] = [
@@ -10,148 +12,203 @@ export const initialCategories: Category[] = [
   { id: 'consejos-generales', name: 'Consejos Generales' },
 ];
 
+const articlesCollection = collection(db, 'articles');
+const usersCollection = collection(db, 'users');
 
-const articlesData: Article[] = [
-  {
-    id: '1',
-    slug: 'entendiendo-limites-velocidad',
-    title: 'Entendiendo los Límites de Velocidad y sus Consecuencias',
-    shortDescription: 'Conoce los diferentes límites de velocidad y las posibles multas por excederlos.',
-    category: 'Reglamentos e Infracciones',
-    imageUrl: 'https://picsum.photos/seed/speeding/600/400',
-    imageHint: 'carretera velocidad',
-    content: {
-      introduction: 'Los límites de velocidad son cruciales para la seguridad vial. Entenderlos ayuda a prevenir accidentes y multas. Este artículo explora los tipos de límites de velocidad y las consecuencias de las infracciones.',
-      points: [
-        'Límites de velocidad en zona urbana vs. carretera.',
-        'Factores que afectan los cambios de límite de velocidad (zonas escolares, construcción).',
-        'Multas y puntos en la licencia por exceso de velocidad.',
-        'Impacto del exceso de velocidad en la gravedad de los accidentes.',
-      ],
-      conclusion: 'Respetar los límites de velocidad es una responsabilidad que cada conductor comparte para garantizar vialidades más seguras para todos.',
-    },
-    readMoreLink: '#',
-    favoriteCount: 120,
-    status: 'published',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    slug: 'importancia-semaforos',
-    title: 'La Importancia de las Señales del Semáforo',
-    shortDescription: 'Descubre por qué los semáforos son esenciales para un flujo vehicular ordenado y para prevenir choques.',
-    category: 'Seguridad Vial',
-    imageUrl: 'https://picsum.photos/seed/trafficlight/600/400',
-    imageHint: 'semaforo calle',
-    content: {
-      introduction: 'Los semáforos son fundamentales para administrar los cruces y los pasos de peatones. Este artículo explica su importancia y cómo interpretar correctamente las señales.',
-      points: [
-        'Significado de las luces roja, amarilla y verde.',
-        'Derecho de paso en cruces con semáforos.',
-        'Consecuencias de pasarse un semáforo en rojo.',
-        'Señales peatonales y seguridad.',
-      ],
-      conclusion: 'Respetar las señales de tránsito es fundamental para mantener el orden y la seguridad en nuestras vialidades.',
-    },
-    readMoreLink: '#',
-    favoriteCount: 95,
-    status: 'published',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    slug: 'practicas-estacionamiento-seguro',
-    title: 'Prácticas de Estacionamiento Seguro para Evitar Multas',
-    shortDescription: 'Domina las reglas de estacionamiento seguro y legal para evitar infracciones y garantizar la accesibilidad.',
-    category: 'Obligaciones',
-    imageUrl: 'https://picsum.photos/seed/parking/600/400',
-    imageHint: 'auto estacionado',
-    content: {
-      introduction: 'Estacionarse correctamente es tan importante como manejar de forma segura. Esta guía cubre regulaciones comunes de estacionamiento y consejos para evitar multas.',
-      points: [
-        'Entender las zonas de no estacionarse y las señales.',
-        'Técnicas y reglas para estacionarse en paralelo.',
-        'Estacionamiento en pendientes y cerca de hidrantes.',
-        'Reglamento de estacionamiento para personas con discapacidad y etiqueta.',
-      ],
-      conclusion: 'El estacionamiento adecuado contribuye al flujo vehicular y la seguridad pública. Siempre pon atención a las señales de estacionamiento y las ordenanzas locales.',
-    },
-    readMoreLink: '#',
-    favoriteCount: 78,
-    status: 'published',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    slug: 'riesgos-manejar-influencia',
-    title: 'Riesgos de Manejar Bajo la Influencia (DUI)',
-    shortDescription: 'Comprende los graves peligros y las repercusiones legales de manejar bajo la influencia del alcohol o drogas.',
-    category: 'Infracciones Graves', // Cambiado para usar una de las initialCategories
-    imageUrl: 'https://picsum.photos/seed/dui/600/400',
-    imageHint: 'peligro volante',
-    content: {
-      introduction: 'Manejar bajo la influencia (DUI, por sus siglas en inglés) es una falta grave con consecuencias que pueden cambiar la vida. Este artículo detalla los riesgos implicados para ti y para los demás.',
-      points: [
-        'Cómo el alcohol y las drogas afectan la habilidad para manejar.',
-        'Límites legales de concentración de alcohol en la sangre (BAC).',
-        'Sanciones por DUI: multas, suspensión de licencia, tiempo en cárcel.',
-        'Impacto a largo plazo de una condena por DUI.',
-        'Alternativas a manejar en estado inconveniente.',
-      ],
-      conclusion: 'Nunca manejes bajo la influencia. Planea con anticipación un transporte seguro a casa para proteger vidas.',
-    },
-    readMoreLink: '#',
-    favoriteCount: 150,
-    status: 'published',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    slug: 'articulo-borrador-ejemplo',
-    title: 'Ejemplo de Artículo en Borrador (Solo Admin)',
-    shortDescription: 'Este es un artículo de ejemplo que está en estado de borrador y solo debería ser visible para administradores.',
-    category: 'Consejos Generales',
-    imageUrl: 'https://picsum.photos/seed/draft/600/400',
-    imageHint: 'documento borrador',
-    content: {
-      introduction: 'Este artículo sirve como demostración de cómo se verían los artículos en borrador en la sección de administración.',
-      points: [
-        'Los borradores no son visibles para usuarios regulares.',
-        'Los administradores pueden editarlos y publicarlos.',
-        'Este es un punto de prueba.',
-      ],
-      conclusion: 'Próximamente más contenido aquí.',
-    },
-    readMoreLink: '#',
-    favoriteCount: 5,
-    status: 'draft', // Este es un borrador
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-// TODO: Reemplazar esto con llamadas a Firestore
-export const getAllArticles = (): Article[] => {
-  // En un futuro, esto obtendría artículos de Firestore.
-  // Por ahora, para el dashboard de admin, podríamos filtrar por status.
-  return articlesData;
+const convertFirestoreDocToArticle = (doc: DocumentData): Article => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    slug: data.slug,
+    title: data.title,
+    shortDescription: data.shortDescription,
+    category: data.category,
+    imageUrl: data.imageUrl,
+    imageHint: data.imageHint,
+    content: data.content,
+    readMoreLink: data.readMoreLink,
+    favoriteCount: data.favoriteCount || 0,
+    status: data.status,
+    createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString(),
+    updatedAt: data.updatedAt?.toDate().toISOString() || new Date().toISOString(),
+  };
 };
 
-export const getPublishedArticles = (): Article[] => {
-  return articlesData.filter(article => article.status === 'published');
+export const getAllArticles = async (): Promise<Article[]> => {
+  const snapshot = await getDocs(articlesCollection);
+  return snapshot.docs.map(convertFirestoreDocToArticle);
 };
 
-export const getDraftArticles = (): Article[] => {
-  return articlesData.filter(article => article.status === 'draft');
+export const getPublishedArticles = async (): Promise<Article[]> => {
+  const q = query(articlesCollection, where('status', '==', 'published'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(convertFirestoreDocToArticle);
 };
 
-export const getArticleBySlug = (slug: string): Article | undefined => {
-  // Esto también necesitaría buscar en Firestore
-  return articlesData.find((article) => article.slug === slug);
+export const getDraftArticles = async (): Promise<Article[]> => {
+  const q = query(articlesCollection, where('status', '==', 'draft'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(convertFirestoreDocToArticle);
+};
+
+export const getArticleBySlug = async (slug: string): Promise<Article | undefined> => {
+  const q = query(articlesCollection, where('slug', '==', slug));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) {
+    return undefined;
+  }
+  return convertFirestoreDocToArticle(snapshot.docs[0]);
+};
+
+export const getArticleById = async (articleId: string): Promise<Article | undefined> => {
+  const articleRef = doc(db, 'articles', articleId);
+  const articleDoc = await getDoc(articleRef);
+  if (!articleDoc.exists()) {
+    return undefined;
+  }
+  return convertFirestoreDocToArticle(articleDoc);
+};
+
+
+export const saveArticleToFirestore = async (articleData: any, status: 'draft' | 'published', existingArticleId?: string): Promise<Article> => {
+  const { title, shortDescription, category, imageFile, imageUrl, introduction, points, conclusion } = articleData;
+  const slug = title.toLowerCase().replace(/\s+/g, '-').slice(0, 50);
+
+  let articleImageUrl = imageUrl;
+  if (imageFile) {
+    // Upload image to Firebase Storage
+    const storageRef = ref(storage, `article_images/${Date.now()}_${imageFile.name}`);
+    const snapshot = await uploadBytes(storageRef, imageFile);
+    articleImageUrl = await getDownloadURL(snapshot.ref);
+  } else if (imageUrl === null && existingArticleId) {
+    // If imageUrl is explicitly set to null and it's an update, delete the old image
+    const existingArticle = await getArticleById(existingArticleId);
+    if (existingArticle?.imageUrl) {
+      const imageRef = ref(storage, existingArticle.imageUrl);
+      try {
+        await deleteObject(imageRef);
+        articleImageUrl = null; // Set to null after deletion
+      } catch (error) {
+        console.error("Error deleting old image:", error);
+        // Optionally handle error, maybe keep the old URL or show a warning
+      }
+    }
+  }
+
+
+  const articleContent = {
+    introduction: introduction || '',
+    points: points ? points.split('\n').filter((p: string) => p.trim() !== '') : [],
+    conclusion: conclusion || '',
+  };
+
+  const articleDataToSave = {
+    slug,
+    title,
+    shortDescription: shortDescription || '',
+    category: category || '',
+    imageUrl: articleImageUrl,
+    imageHint: 'custom article', // You might want to make this dynamic
+    content: articleContent,
+    favoriteCount: 0, // New articles start with 0 favorites
+    status,
+    // authorId: auth.currentUser?.uid, // Get authorId from auth context if available
+    createdAt: existingArticleId ? undefined : new Date(), // Set createdAt only for new articles
+    updatedAt: new Date(),
+  };
+
+  let articleRef;
+  let savedArticleId = existingArticleId;
+
+  if (existingArticleId) {
+    articleRef = doc(db, 'articles', existingArticleId);
+    await updateDoc(articleRef, articleDataToSave);
+  } else {
+    const newDocRef = await addDoc(articlesCollection, articleDataToSave);
+    articleRef = newDocRef;
+    savedArticleId = newDocRef.id;
+  }
+
+  // Fetch the saved article to return a complete Article object
+  const savedDoc = await getDoc(articleRef);
+  if (!savedDoc.exists()) {
+      throw new Error("Saved article not found!");
+  }
+
+  return convertFirestoreDocToArticle(savedDoc);
+};
+
+export const deleteArticleFromFirestore = async (articleId: string): Promise<void> => {
+  const articleRef = doc(db, 'articles', articleId);
+
+  // Optional: Delete image from storage before deleting the document
+  try {
+    const articleDoc = await getDoc(articleRef);
+    if (articleDoc.exists()) {
+      const articleData = articleDoc.data();
+      if (articleData?.imageUrl) {
+        // Extract path from the full image URL if necessary
+        // Depending on how you store imageUrl, you might need to parse it
+        const imagePath = articleData.imageUrl.includes(storage.app.options.storageBucket)
+            ? ref(storage, articleData.imageUrl).name // Basic example: get file name from URL if it's a full URL
+            : articleData.imageUrl; // Otherwise assume it's already a path
+
+        const imageRef = ref(storage, `article_images/${imagePath}`); // Reconstruct the storage ref
+        await deleteObject(imageRef);
+      }
+    }
+  } catch (error) {
+    console.error("Error deleting article image from storage:", error);
+    // Continue with document deletion even if image deletion fails
+  }
+
+  await deleteDoc(articleRef);
+};
+
+
+export const toggleArticleLike = async (userId: string, articleId: string, isLiked: boolean): Promise<void> => {
+  const userRef = doc(usersCollection, userId);
+  const articleRef = doc(articlesCollection, articleId);
+
+  await runTransaction(db, async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const articleDoc = await transaction.get(articleRef);
+
+    if (!userDoc.exists()) {
+      throw new Error("User does not exist!");
+    }
+    if (!articleDoc.exists()) {
+      throw new Error("Article does not exist!");
+    }
+
+    const userData = userDoc.data();
+    const articleData = articleDoc.data();
+    const likedArticles = userData?.likedArticles || [];
+    let currentFavoriteCount = articleData?.favoriteCount || 0;
+
+    if (isLiked) {
+      if (!likedArticles.includes(articleId)) {
+        transaction.update(userRef, { likedArticles: arrayUnion(articleId) });
+        transaction.update(articleRef, { favoriteCount: currentFavoriteCount + 1 });
+      }
+    } else {
+      if (likedArticles.includes(articleId)) {
+        transaction.update(userRef, { likedArticles: arrayRemove(articleId) });
+        // Ensure favoriteCount doesn't go below zero
+        transaction.update(articleRef, { favoriteCount: Math.max(0, currentFavoriteCount - 1) });
+      }
+    }
+  });
+};
+
+export const getUserLikedArticles = async (userId: string): Promise<string[]> => {
+  const userRef = doc(usersCollection, userId);
+  const userDoc = await getDoc(userRef);
+  if (userDoc.exists()) {
+    const userData = userDoc.data();
+    return userData?.likedArticles || [];
+  }
+  return [];
 };
 
 export const getCategories = (): Category[] => {
