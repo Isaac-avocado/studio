@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, Mail, Edit3, Camera, Loader2, Save, Trash2, LockKeyhole, ShieldAlert, LogOut, AlertCircle, LinkIcon } from 'lucide-react';
+import { User, Mail, Edit3, Camera, Loader2, Save, Trash2, LockKeyhole, ShieldAlert, LogOut, AlertCircle, LinkIcon, ImageOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -29,7 +29,6 @@ import { Separator } from '@/components/ui/separator';
 
 const profileSchema = z.object({
   username: z.string().min(3, 'El nombre de usuario debe tener al menos 3 caracteres.').max(50, 'El nombre de usuario no puede exceder los 50 caracteres.'),
-  profileImageFile: z.custom<FileList>().optional(),
   imageUrl: z.string().url('Debe ser una URL de imagen válida o estar vacío.').or(z.literal('')).optional(),
 });
 
@@ -46,8 +45,6 @@ const passwordChangeSchema = z.object({
 
 type PasswordChangeFormValues = z.infer<typeof passwordChangeSchema>;
 
-const getFileExtension = (filename: string) => filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2);
-
 export function UserProfileForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -58,7 +55,6 @@ export function UserProfileForm() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
@@ -69,7 +65,6 @@ export function UserProfileForm() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       username: '',
-      profileImageFile: undefined,
       imageUrl: '',
     },
   });
@@ -89,7 +84,6 @@ export function UserProfileForm() {
         setCurrentUser(user);
         profileForm.reset({
           username: user.displayName || '',
-          profileImageFile: undefined,
           imageUrl: user.photoURL || '',
         });
         setImagePreviewUrl(user.photoURL);
@@ -102,7 +96,7 @@ export function UserProfileForm() {
       } else {
         setCurrentUser(null);
         setFirestoreUser(null);
-        profileForm.reset({ username: '', profileImageFile: undefined, imageUrl: '' });
+        profileForm.reset({ username: '', imageUrl: '' });
         setImagePreviewUrl(null);
       }
       setIsLoading(false);
@@ -110,53 +104,21 @@ export function UserProfileForm() {
     return () => unsubscribe();
   }, [profileForm, router]);
 
-  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files[0]) {
-      const file = files[0];
-      if (!file.type.startsWith('image/')) {
-        toast({ variant: "destructive", title: "Archivo inválido", description: "Por favor, selecciona un archivo de imagen." });
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-         toast({ variant: "destructive", title: "Archivo demasiado grande", description: "El tamaño máximo de la imagen es 5MB." });
-        return;
-      }
-      profileForm.setValue('profileImageFile', files, { shouldDirty: true });
-      profileForm.setValue('imageUrl', '', { shouldDirty: true }); // Clear URL if file is selected
-      setImagePreviewUrl(URL.createObjectURL(file));
-    }
-  };
 
   const handleImageUrlInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const url = event.target.value;
-    profileForm.setValue('imageUrl', url, { shouldDirty: true }); // Update form state
-    if (url) {
-        // Basic check for URL format, Zod handles full validation on submit
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-            setImagePreviewUrl(url);
-            profileForm.setValue('profileImageFile', undefined, { shouldDirty: true }); // Clear file if URL is typed
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        } else if (imagePreviewUrl !== currentUser?.photoURL) { // if input is cleared and preview was not original
-             // Check if Zod considers the current URL input invalid
-            const { error } = profileSchema.shape.imageUrl.safeParse(url);
-            if (error) { // If current URL input is invalid
-              setImagePreviewUrl(currentUser?.photoURL || null); // Revert to original
-            }
-            // If it's not an error but not a full URL yet, don't revert, let user type
-        }
-    } else { // URL field is empty
-      setImagePreviewUrl(currentUser?.photoURL || null); // Revert to original or null
+    profileForm.setValue('imageUrl', url, { shouldDirty: true });
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        setImagePreviewUrl(url);
+    } else if (!url) { // URL field is empty or invalid, revert to original or null
+        setImagePreviewUrl(currentUser?.photoURL || null);
     }
+    // If URL is partially typed but not yet valid, let it be for now, Zod will catch it
   };
   
   const clearImage = () => {
     setImagePreviewUrl(null);
     profileForm.setValue('imageUrl', '', { shouldDirty: true });
-    profileForm.setValue('profileImageFile', undefined, { shouldDirty: true });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
 
@@ -184,7 +146,6 @@ export function UserProfileForm() {
       setFirestoreUser(prev => prev ? {...prev, photoURL: null} : null);
       profileForm.reset({ 
         username: profileForm.getValues('username'), 
-        profileImageFile: undefined,
         imageUrl: '' 
       });
       toast({ title: 'Foto de perfil eliminada', description: 'Tu foto de perfil ha sido eliminada.' });
@@ -203,39 +164,20 @@ export function UserProfileForm() {
     }
     setIsUpdatingProfile(true);
 
-    let newPhotoURL: string | null = currentUser.photoURL; // Start with current user's photoURL
+    let newPhotoURL: string | null = currentUser.photoURL; 
     const oldPhotoURL = currentUser.photoURL;
+    let shouldDeleteOldStorageImage = false;
 
     try {
-        // Determine if we need to delete an old image from storage
-        let shouldDeleteOldStorageImage = false;
-
-        if (values.profileImageFile && values.profileImageFile[0]) { // New file uploaded
+        if (values.imageUrl !== oldPhotoURL) { // URL has changed (could be new, empty, or different)
             if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
                 shouldDeleteOldStorageImage = true;
             }
-            const file = values.profileImageFile[0];
-            const extension = getFileExtension(file.name);
-            const imageFileName = `profile_image.${extension}`;
-            const imageRef = storageRef(storage, `profile-pictures/${currentUser.uid}/${imageFileName}`);
-            
-            await uploadBytesResumable(imageRef, file);
-            newPhotoURL = await getDownloadURL(imageRef);
-
-        } else if (values.imageUrl && values.imageUrl !== oldPhotoURL) { // New URL provided
-            if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
-                shouldDeleteOldStorageImage = true;
-            }
-            newPhotoURL = values.imageUrl;
-        } else if (imagePreviewUrl === null && oldPhotoURL !== null) { // Image was explicitly removed
-            if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
-                shouldDeleteOldStorageImage = true;
-            }
-            newPhotoURL = null;
+            newPhotoURL = values.imageUrl || null; // If imageUrl is empty string, set newPhotoURL to null
         }
+        // If values.imageUrl is the same as oldPhotoURL, newPhotoURL remains oldPhotoURL, no storage deletion needed.
 
-
-        if (shouldDeleteOldStorageImage && oldPhotoURL) { // Ensure oldPhotoURL is not null
+        if (shouldDeleteOldStorageImage && oldPhotoURL) { 
             try {
                 const oldImageRef = storageRef(storage, oldPhotoURL);
                 await deleteObject(oldImageRef);
@@ -259,13 +201,11 @@ export function UserProfileForm() {
       
       setCurrentUser(auth.currentUser); 
       setFirestoreUser(prev => prev ? {...prev, username: values.username, photoURL: newPhotoURL} : null);
-      // Reset form with new values, mark as not dirty
       profileForm.reset({ 
           username: values.username, 
-          profileImageFile: undefined, // Clear file input after successful upload/URL use
-          imageUrl: newPhotoURL || '' // Update form's imageUrl with the final URL
+          imageUrl: newPhotoURL || '' 
         }, { keepDirty: false });
-      setImagePreviewUrl(newPhotoURL); // Ensure preview matches the saved state
+      setImagePreviewUrl(newPhotoURL); 
 
 
       toast({ title: 'Perfil actualizado', description: 'Tu información de perfil ha sido guardada.' });
@@ -273,9 +213,7 @@ export function UserProfileForm() {
       console.error('Error updating profile:', error);
       let errorMessage = 'No se pudo actualizar el perfil.';
       if (error.code === 'storage/unauthorized') {
-        errorMessage = 'No tienes permiso para subir la imagen. Revisa las reglas de Firebase Storage.';
-      } else if (error.message && error.message.includes('storage/object-not-found') && (values.imageUrl || (values.profileImageFile && values.profileImageFile[0]))){
-         errorMessage = 'Hubo un problema con la URL de la imagen o al acceder a la imagen anterior.';
+        errorMessage = 'No tienes permiso para acceder al almacenamiento de imágenes.';
       }
       toast({ variant: 'destructive', title: 'Error de perfil', description: errorMessage });
     } finally {
@@ -430,73 +368,53 @@ export function UserProfileForm() {
                 <User size={60} className="text-muted-foreground" />
               </AvatarFallback>
             </Avatar>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                <Camera size={16} className="mr-2" /> Cambiar Foto
-              </Button>
-              {imagePreviewUrl && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" variant="destructive" size="sm" disabled={isUpdatingProfile || !imagePreviewUrl /* Disable if no image to remove */}>
-                      <Trash2 size={16} className="mr-2" /> Quitar Foto
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar foto de perfil?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción eliminará tu foto de perfil. No se puede deshacer.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={removeProfilePicture} disabled={isUpdatingProfile}>
-                        {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-            <Controller
-              name="profileImageFile"
-              control={profileForm.control}
-              render={({ field }) => ( // field prop is not directly used for input's value/onChange here
-                <Input
-                  id="profileImageFile"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={(e) => { // Directly handle change for file input
-                    handleImageFileChange(e);
-                  }}
-                />
-              )}
-            />
-            {profileForm.formState.errors.profileImageFile && (
-              <p className="text-sm text-destructive">{(profileForm.formState.errors.profileImageFile as any).message}</p>
-            )}
             
             <div className="w-full max-w-sm space-y-2">
-                <Label htmlFor="imageUrlInput" className="flex items-center gap-1 text-xs text-muted-foreground justify-center">O pega una URL de imagen:</Label>
-                <Controller
-                    name="imageUrl"
-                    control={profileForm.control}
-                    render={({ field }) => (
-                        <Input
-                        id="imageUrlInput"
-                        type="url"
-                        placeholder="https://ejemplo.com/imagen.png"
-                        {...field}
-                        onChange={(e) => {
-                            field.onChange(e); // Important for react-hook-form
-                            handleImageUrlInputChange(e);
-                        }}
-                        />
+                <Label htmlFor="imageUrlInput" className="flex items-center gap-1 text-primary/90 justify-center">
+                  <LinkIcon size={16} className="mr-1"/> URL de la Imagen de Perfil:
+                </Label>
+                <div className="flex items-center gap-2">
+                    <Controller
+                        name="imageUrl"
+                        control={profileForm.control}
+                        render={({ field }) => (
+                            <Input
+                            id="imageUrlInput"
+                            type="url"
+                            placeholder="https://ejemplo.com/imagen.png"
+                            {...field}
+                            onChange={(e) => {
+                                field.onChange(e); 
+                                handleImageUrlInputChange(e);
+                            }}
+                            className="flex-grow"
+                            />
+                        )}
+                    />
+                    {imagePreviewUrl && (
+                        <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" title="Quitar imagen actual">
+                                <ImageOff size={20} />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar foto de perfil?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta acción eliminará tu foto de perfil. Deberás guardar los cambios para que sea permanente.
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={clearImage} className="bg-destructive hover:bg-destructive/80">
+                                Sí, quitar
+                            </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                        </AlertDialog>
                     )}
-                />
+                </div>
                 {profileForm.formState.errors.imageUrl && (
                 <p className="text-sm text-destructive text-center">{profileForm.formState.errors.imageUrl.message}</p>
                 )}
@@ -666,5 +584,3 @@ export function UserProfileForm() {
     </Card>
   );
 }
-
-    
