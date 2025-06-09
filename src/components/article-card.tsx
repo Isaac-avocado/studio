@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ExternalLink, Tag, Heart, MoreVertical, Edit, Send, EyeOff, Trash2, Loader2 } from 'lucide-react'; // EyeOff para ocultar
+import { ExternalLink, Tag, Heart, MoreVertical, Edit, Send, EyeOff, Trash2, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { rtdb } from '@/lib/firebase/config';
@@ -31,6 +31,12 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
   const { toast } = useToast();
 
   useEffect(() => {
+    // Ensure article.slug is defined before creating a ref
+    if (!article.slug) {
+        // console.warn("Article slug is undefined, cannot fetch favorites for:", article.title);
+        setRtdbFavoriteCount(article.favoriteCount || 0);
+        return;
+    }
     const favCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
     const listener = onValue(favCountRef, (snapshot) => {
       const count = snapshot.val();
@@ -48,7 +54,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isProcessingAdminAction) return; // Evitar interacción si se está procesando otra acción
+    if (isProcessingAdminAction || !article.slug) return; 
 
     const newIsFavoriteState = !isFavorite;
     setIsFavorite(newIsFavoriteState);
@@ -57,7 +63,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
     runTransaction(articleFavCountRef, (currentCount) => {
       const initialCount = article.favoriteCount || 0;
       if (currentCount === null) {
-        return newIsFavoriteState ? Math.max(1, initialCount + 1) : Math.max(0, initialCount);
+        return newIsFavoriteState ? Math.max(1, initialCount + 1) : Math.max(0, initialCount > 0 ? initialCount -1 : 0) ;
       }
       if (newIsFavoriteState) {
         return currentCount + 1;
@@ -75,16 +81,14 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
     setIsProcessingAdminAction(true);
     try {
       if (action === 'edit' && onEdit) onEdit(article);
-      if (action === 'delete' && onDelete) onDelete(article); // La confirmación se maneja en DashboardPage
+      if (action === 'delete' && onDelete) onDelete(article);
       if (action === 'togglePublish' && onTogglePublish) await onTogglePublish(article);
     } catch (error) {
         toast({ variant: "destructive", title: "Error de Admin", description: `No se pudo realizar la acción: ${action}` });
     } finally {
-        // No resetear isProcessingAdminAction aquí si la acción principal (como abrir dialog)
-        // debe mantener el control, o si el componente se desmonta.
-        // Considerar resetearlo desde el componente padre si es necesario.
-        // Por ahora, para acciones rápidas como togglePublish lo reseteamos.
-        if (action === 'togglePublish') setIsProcessingAdminAction(false);
+        if (action === 'togglePublish' || action === 'edit' || action === 'delete') {
+            setIsProcessingAdminAction(false);
+        }
     }
   };
   
@@ -98,14 +102,21 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
       )}>
       <CardHeader className="p-0 relative">
         <div className="relative w-full h-48">
+          {article.imageUrl && (
           <Image
             src={article.imageUrl || 'https://placehold.co/600x400.png?text=Art%C3%ADculo'}
-            alt={article.title}
-            layout="fill"
-            objectFit="cover"
+            alt={article.title || 'Article image'}
+            fill
+            style={{ objectFit: 'cover' }}
             data-ai-hint={article.imageHint || 'article image'}
             className={cn(isProcessingAdminAction && "opacity-50")}
           />
+          )}
+           {!article.imageUrl && (
+            <div className="w-full h-48 bg-muted flex items-center justify-center text-muted-foreground">
+              Sin imagen
+            </div>
+          )}
         </div>
         <div className="absolute top-2 right-2 flex gap-2">
             <Button
@@ -114,7 +125,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
                 className="bg-background/70 hover:bg-background/90 text-destructive hover:text-destructive rounded-full h-9 w-9"
                 onClick={handleFavoriteClick}
                 aria-label={isFavorite ? "Quitar de destacados" : "Marcar como destacado"}
-                disabled={isProcessingAdminAction}
+                disabled={isProcessingAdminAction || !article.slug}
             >
                 <Heart className={cn("h-5 w-5", isFavorite && "fill-destructive")} />
             </Button>

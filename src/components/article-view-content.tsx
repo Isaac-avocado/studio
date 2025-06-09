@@ -109,13 +109,15 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
         <CardHeader className="p-0 relative">
           <div className="relative w-full h-64 md:h-96">
             <Image
-              src={article.imageUrl}
+              src={article.imageUrl || ''} // Provide empty string as fallback for src
               alt={article.title}
-              layout="fill"
-              objectFit="cover"
+              fill // Use fill prop
+              style={{ objectFit: 'cover' }} // Use style prop for object-fit
               data-ai-hint={article.imageHint}
               priority
             />
+            {/* Add a fallback if no image is available */}
+            {!article.imageUrl && <div className="absolute inset-0 flex items-center justify-center bg-gray-200 text-gray-500">No Image Available</div>}
           </div>
            <div className="absolute top-3 right-3 flex gap-2">
             <Button
@@ -155,26 +157,32 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
           
           <Separator className="my-6 animate-in fade-in-0 duration-500 delay-500" />
 
-          <div className="prose prose-lg max-w-none text-foreground/90 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-600">
-            <p className="lead text-lg mb-6">{article.content.introduction}</p>
-            
-            {article.content.points && article.content.points.length > 0 && (
-              <>
-                <h3 className="text-xl font-semibold mb-3 mt-6 text-primary/90 flex items-center ">
-                  <BookOpen className="mr-2 h-5 w-5" /> Puntos Clave:
-                </h3>
-                <ul className="list-disc space-y-2 pl-5 mb-6">
-                  {article.content.points.map((point, index) => (
-                    <li key={index}>{point}</li>
-                  ))}
-                </ul>
-              </>
-            )}
+          {article.content && typeof article.content === 'object' ? (
+            <div className="prose prose-lg max-w-none text-foreground/90 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-600">
+              {article.content.introduction && (
+                <p className="lead text-lg mb-6">{article.content.introduction}</p>
+              )}
 
-            {article.content.conclusion && (
-              <p className="mt-6 border-l-4 border-primary pl-4 italic text-foreground/80">{article.content.conclusion}</p>
+              {article.content.points && Array.isArray(article.content.points) && article.content.points.length > 0 && (
+                <>
+                  <h3 className="text-xl font-semibold mb-3 mt-6 text-primary/90 flex items-center ">
+                    <BookOpen className="mr-2 h-5 w-5" /> Puntos Clave:
+                  </h3>
+                  <ul className="list-disc space-y-2 pl-5 mb-6">
+                    {article.content.points.map((point, index) => (
+                      <li key={index}>{point}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {article.content.conclusion && (
+                <p className="mt-6 border-l-4 border-primary pl-4 italic text-foreground/80">{article.content.conclusion}</p>
+              )}
+            </div>
+            ) : (
+            <div className="text-foreground/80 italic animate-in fade-in-0 duration-500 delay-600">No content available for this article.</div>
             )}
-          </div>
 
           {article.readMoreLink && article.readMoreLink !== '#' && (
             <div className="mt-10 text-center animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-700">
