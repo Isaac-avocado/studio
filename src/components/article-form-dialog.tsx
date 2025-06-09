@@ -168,8 +168,8 @@ export function ArticleFormDialog({ isOpen, onOpenChange, article, onSave }: Art
             <Label htmlFor="imageUrl" className="flex items-center gap-1"><ImageIcon size={16}/> Imagen del Artículo</Label>
             {imagePreview && (
               <div className="relative group">
-                <Image src={imagePreview} alt="Vista previa" width={600} height={400} className="rounded-md object-cover w-full aspect-video" data-ai-hint="article cover" />
-                <Button variant="destructive" size="icon" className="absolute top-2 right-2 opacity-70 group-hover:opacity-100" onClick={clearImage} type="button">
+                <Image src={imagePreview} alt="Vista previa" fill style={{ objectFit: 'cover' }} className="rounded-md" data-ai-hint="article cover" />
+                <Button variant="destructive" size="icon" className="absolute top-2 right-2 opacity-70 group-hover:opacity-100 z-10" onClick={clearImage} type="button">
                   <XCircle size={18} />
                 </Button>
               </div>

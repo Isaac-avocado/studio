@@ -11,7 +11,7 @@ export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const article = getArticleBySlug(params.slug);
+  const article = await getArticleBySlug(params.slug);
 
   if (!article) {
     return {
@@ -32,9 +32,10 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function ArticlePage({ params }: Props) {
-  const article = getArticleBySlug(params.slug);
+export default async function ArticlePage({ params }: Props) {
+  const article = await getArticleBySlug(params.slug);
 
+  console.log("Fetched article:", JSON.stringify(article, null, 2)); // Add this line
   if (!article) {
     notFound();
   }

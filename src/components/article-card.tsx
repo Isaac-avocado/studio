@@ -95,27 +95,21 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
   const isDraftByAdmin = isAdmin && article.status === 'draft';
 
   return (
-    <Card className={cn(
-        "overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col h-full",
+    <Card className={cn("overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col h-full",
         isDraftByAdmin && "opacity-70 grayscale hover:opacity-90 hover:grayscale-0",
         isProcessingAdminAction && "cursor-not-allowed opacity-60"
       )}>
       <CardHeader className="p-0 relative">
         <div className="relative w-full h-48">
           {article.imageUrl && (
-          <Image
-            src={article.imageUrl || 'https://placehold.co/600x400.png?text=Art%C3%ADculo'}
-            alt={article.title || 'Article image'}
-            fill
-            style={{ objectFit: 'cover' }}
+            <Image
+              src={article.imageUrl}
+              alt={article.title || 'Article image'}
+              fill
+              style={{ objectFit: 'cover' }}
             data-ai-hint={article.imageHint || 'article image'}
             className={cn(isProcessingAdminAction && "opacity-50")}
           />
-          )}
-           {!article.imageUrl && (
-            <div className="w-full h-48 bg-muted flex items-center justify-center text-muted-foreground">
-              Sin imagen
-            </div>
           )}
         </div>
         <div className="absolute top-2 right-2 flex gap-2">
