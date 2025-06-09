@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { ArticleFormDialog } from '@/components/article-form-dialog';
 import type { Article, Category } from '@/types';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { auth, rtdb } from '@/lib/firebase/config'; // Import rtdb
+import { ref, get as getRTDBData } from 'firebase/database'; // Import ref and get from RTDB
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
@@ -29,10 +30,32 @@ export default function DashboardPage() {
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const fetchArticlesWithRTDBCounts = async (articles: Article[]): Promise<Article[]> => {
+    const articlesWithCounts = await Promise.all(
+      articles.map(async (article) => {
+        if (!article.slug) return { ...article, favoriteCount: article.favoriteCount || 0 };
+        try {
+          const favCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
+          const snapshot = await getRTDBData(favCountRef);
+          const count = snapshot.val();
+          return { ...article, favoriteCount: count !== null ? count : (article.favoriteCount || 0) };
+        } catch (error) {
+          console.error(`Error fetching RTDB count for ${article.slug}:`, error);
+          return { ...article, favoriteCount: article.favoriteCount || 0 }; // Fallback to Firestore count
+        }
+      })
+    );
+    return articlesWithCounts;
+  };
+
   const fetchArticles = useCallback(async () => {
     try {
-      const published = await getPublishedArticles();
-      const drafts = await getDraftArticles();
+      let published = await getPublishedArticles();
+      let drafts = await getDraftArticles();
+
+      published = await fetchArticlesWithRTDBCounts(published);
+      drafts = await fetchArticlesWithRTDBCounts(drafts); // Also update drafts if needed for consistency
+
       setPublishedArticles(published);
       setDraftArticles(drafts);
     } catch (error) {
@@ -68,10 +91,13 @@ export default function DashboardPage() {
   }, [fetchArticles, fetchUserLikedArticles]);
 
   const handleArticleLikeUpdated = useCallback(async () => {
+    // Refetch articles to get updated RTDB counts for sorting
+    await fetchArticles();
     if (currentUser) {
-      await fetchUserLikedArticles(currentUser.uid);
+      await fetchUserLikedArticles(currentUser.uid); // Also update user's liked list
     }
-  }, [currentUser, fetchUserLikedArticles]);
+  }, [currentUser, fetchArticles, fetchUserLikedArticles]);
+
 
   const handleOpenArticleForm = (article?: Article) => {
     setEditingArticle(article || null);
@@ -157,7 +183,9 @@ export default function DashboardPage() {
       if (aIsLiked && !bIsLiked) return -1;
       if (!aIsLiked && bIsLiked) return 1;
 
-      return (b.favoriteCount || 0) - (a.favoriteCount || 0);
+      // If both are liked or both are not liked, sort by favoriteCount descending
+      // This favoriteCount should now be the RTDB count
+      return (b.favoriteCount || 0) - (a.favoriteCount || 0); 
     });
   }, [publishedArticles, userLikedArticleSlugs]);
 
@@ -267,5 +295,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
