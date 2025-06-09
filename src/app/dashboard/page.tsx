@@ -1,24 +1,19 @@
 // src/app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react'; // Added useCallback
-import { getPublishedArticles, getDraftArticles, getCategories, saveArticleToFirestore, deleteArticleFromFirestore } from '@/lib/articles'; // Actualizado
+import { useState, useEffect, useCallback, useMemo } from 'react'; // Added useMemo
+import { getPublishedArticles, getDraftArticles, getCategories, saveArticleToFirestore, deleteArticleFromFirestore, getUserLikedArticles } from '@/lib/articles'; // Actualizado, Added getUserLikedArticles
 import { ArticleCard } from '@/components/article-card';
 import { AiSuggester } from '@/components/ai-suggester';
-import { Newspaper, Lightbulb, PlusCircle, Archive, Edit, Send, Trash2, ShieldAlert, Loader2 } from 'lucide-react'; // Added Loader2
+import { Newspaper, Lightbulb, PlusCircle, Archive, Edit, Send, Trash2, ShieldAlert, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ArticleFormDialog } from '@/components/article-form-dialog'; // Nuevo
+import { ArticleFormDialog } from '@/components/article-form-dialog';
 import type { Article, Category } from '@/types';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
-
-// export const metadata = { // Metadata no se puede usar en 'use client'
-//   title: 'Panel Principal - Mi Asesor Vial',
-//   description: 'Explora artículos sobre seguridad vial y obtén consejos de nuestra IA.',
-// };
 
 export default function DashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -29,12 +24,12 @@ export default function DashboardPage() {
 
   const [publishedArticles, setPublishedArticles] = useState<Article[]>([]);
   const [draftArticles, setDraftArticles] = useState<Article[]>([]);
+  const [userLikedArticleSlugs, setUserLikedArticleSlugs] = useState<string[]>([]); // New state for liked slugs
 
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Helper function to fetch articles
-  const fetchArticles = useCallback(async () => { // Wrapped in useCallback
+  const fetchArticles = useCallback(async () => {
     try {
       const published = await getPublishedArticles();
       const drafts = await getDraftArticles();
@@ -42,23 +37,36 @@ export default function DashboardPage() {
       setDraftArticles(drafts);
     } catch (error) {
       console.error("Error fetching articles:", error);
-      // Optionally handle error, e.g., set articles to empty arrays or show a toast
+      toast({ variant: "destructive", title: "Error al cargar artículos", description: "No se pudieron obtener los artículos." });
     }
-  }, []); // Empty dependency array means this function is created once
+  }, [toast]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      if (user && user.email === 'admin@test.com') {
-        setIsAdmin(true);
+      if (user) {
+        if (user.email === 'admin@test.com') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+        // Fetch user's liked articles
+        try {
+          const likedSlugs = await getUserLikedArticles(user.uid);
+          setUserLikedArticleSlugs(likedSlugs);
+        } catch (error) {
+          console.error("Error fetching user liked articles:", error);
+          setUserLikedArticleSlugs([]); // Default to empty on error
+        }
       } else {
         setIsAdmin(false);
+        setUserLikedArticleSlugs([]); // Clear liked articles if no user
       }
-      fetchArticles(); // Fetch articles on auth state change
+      fetchArticles();
     });
 
     return () => unsubscribe();
-  }, [fetchArticles]); // Add fetchArticles to dependency array
+  }, [fetchArticles]);
 
   const handleOpenArticleForm = (article?: Article) => {
     setEditingArticle(article || null);
@@ -106,19 +114,15 @@ export default function DashboardPage() {
   const handleTogglePublishStatus = async (article: Article) => {
     const newStatus = article.status === 'published' ? 'draft' : 'published';
     try {
-      // We need to pass the full article data to saveArticleToFirestore
-      // as if it came from the form, because saveArticleToFirestore now
-      // handles creating/updating the full document.
       const articleDataToSave = {
           title: article.title,
           shortDescription: article.shortDescription,
-          // Find the category ID based on the name if necessary, or store ID directly
           category: getCategories().find(c => c.name === article.category)?.id || article.category,
           imageUrl: article.imageUrl,
-          // Assuming content.points is an array, join it back for the function expecting a string
           introduction: article.content.introduction,
           points: Array.isArray(article.content.points) ? article.content.points.join('\n') : '',
           conclusion: article.content.conclusion,
+          imageHint: article.imageHint, // Make sure imageHint is passed
       };
 
       await saveArticleToFirestore(
@@ -136,6 +140,22 @@ export default function DashboardPage() {
       toast({ variant: "destructive", title: "Error al actualizar estado", description: "No se pudo cambiar el estado del artículo." });
     }
   };
+
+  const sortedPublishedArticles = useMemo(() => {
+    if (!publishedArticles || publishedArticles.length === 0) {
+      return [];
+    }
+    return [...publishedArticles].sort((a, b) => {
+      const aIsLiked = userLikedArticleSlugs.includes(a.slug);
+      const bIsLiked = userLikedArticleSlugs.includes(b.slug);
+
+      if (aIsLiked && !bIsLiked) return -1; // a comes first
+      if (!aIsLiked && bIsLiked) return 1;  // b comes first
+
+      // If both are liked, or both are not liked, sort by favoriteCount (descending from Firestore)
+      return (b.favoriteCount || 0) - (a.favoriteCount || 0);
+    });
+  }, [publishedArticles, userLikedArticleSlugs]);
 
 
   return (
@@ -192,9 +212,9 @@ export default function DashboardPage() {
              <Newspaper className="w-10 h-10 text-primary-foreground drop-shadow-sm" />
             <h2 className="text-3xl font-bold text-primary-foreground drop-shadow-sm">Artículos Destacados</h2>
           </div>
-          {publishedArticles.length > 0 ? (
+          {sortedPublishedArticles.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ">
-              {publishedArticles.map((article, index) => (
+              {sortedPublishedArticles.map((article, index) => (
                 <div key={article.id || article.slug} className="animate-in fade-in-0 slide-in-from-bottom-5 duration-500" style={{ animationDelay: `${300 + index * 100}ms` }}>
                   <ArticleCard
                     article={article}
@@ -241,3 +261,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
