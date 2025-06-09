@@ -7,70 +7,99 @@ import Link from 'next/link';
 import type { Article } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, BookOpen, Link2, Tag, Heart, Share2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Link2, Tag, Heart, Share2, ImageIcon, Loader2 } from 'lucide-react'; // Added ImageIcon, Loader2
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { rtdb } from '@/lib/firebase/config'; // Import RTDB
-import { ref, onValue, runTransaction, off } from 'firebase/database'; // Import RTDB functions
+import { rtdb, auth, db } from '@/lib/firebase/config'; // Added auth, db
+import { ref, onValue, runTransaction, off } from 'firebase/database';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth'; // Added User
+import { getUserLikedArticles, updateUserArticleLike } from '@/lib/articles'; // Added new functions
 
 interface ArticleViewContentProps {
   article: Article;
 }
 
 export function ArticleViewContent({ article }: ArticleViewContentProps) {
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userLikedArticleSlugs, setUserLikedArticleSlugs] = useState<string[]>([]);
+  const [isProcessingLike, setIsProcessingLike] = useState(false);
   const [rtdbFavoriteCount, setRtdbFavoriteCount] = useState<number>(article.favoriteCount);
   const { toast } = useToast();
 
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user && article.slug) {
+        const likedSlugs = await getUserLikedArticles(user.uid);
+        setUserLikedArticleSlugs(likedSlugs);
+      } else {
+        setUserLikedArticleSlugs([]);
+      }
+    });
+    return () => unsubscribeAuth();
+  }, [article.slug]);
+
+  useEffect(() => {
+    if (!article.slug) {
+        setRtdbFavoriteCount(article.favoriteCount || 0);
+        return;
+    }
     const favCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
     const listener = onValue(favCountRef, (snapshot) => {
       const count = snapshot.val();
-      if (count !== null) {
-        setRtdbFavoriteCount(count);
-      } else {
-        setRtdbFavoriteCount(article.favoriteCount);
-      }
+      setRtdbFavoriteCount(count !== null ? count : (article.favoriteCount || 0));
+    }, (error) => {
+      console.error(`Error fetching RTDB count for ${article.slug}:`, error);
+      setRtdbFavoriteCount(article.favoriteCount || 0); // Fallback on error
     });
     return () => {
       off(favCountRef, 'value', listener);
     };
   }, [article.slug, article.favoriteCount]);
+  
+  const isLikedByUser = currentUser ? userLikedArticleSlugs.includes(article.slug) : false;
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleLikeClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!currentUser || !article.slug || isProcessingLike) {
+       if(!currentUser) toast({title: "Inicia sesión", description: "Debes iniciar sesión para marcar un artículo como favorito."});
+      return;
+    }
 
-    const newIsFavoriteState = !isFavorite;
-    setIsFavorite(newIsFavoriteState);
+    setIsProcessingLike(true);
+    const newLikedStateForUser = !isLikedByUser;
 
-    toast({
-      title: newIsFavoriteState ? "Agregado a destacados" : "Eliminado de destacados",
-      description: `"${article.title}" ${newIsFavoriteState ? 'ahora está en tus destacados.' : 'ya no está en tus destacados.'}`,
-    });
-    
-    const articleFavCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
-    runTransaction(articleFavCountRef, (currentCount) => {
-      if (currentCount === null) {
-        return newIsFavoriteState ? Math.max(1, article.favoriteCount + 1) : Math.max(0, article.favoriteCount);
-      }
-      if (newIsFavoriteState) {
-        return currentCount + 1;
-      } else {
-        return Math.max(0, currentCount - 1);
-      }
-    }).catch(error => {
-      console.error("Transaction failed: ", error);
-      setIsFavorite(!newIsFavoriteState); // Revert optimistic update
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo actualizar el contador de favoritos.",
+    try {
+      await updateUserArticleLike(currentUser.uid, article.slug, newLikedStateForUser);
+
+      const articleFavCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
+      await runTransaction(articleFavCountRef, (currentCount) => {
+        if (currentCount === null) {
+          return newLikedStateForUser ? 1 : 0;
+        }
+        return newLikedStateForUser ? currentCount + 1 : Math.max(0, currentCount - 1);
       });
-    });
+
+      if (newLikedStateForUser) {
+        setUserLikedArticleSlugs(prev => [...prev, article.slug]);
+      } else {
+        setUserLikedArticleSlugs(prev => prev.filter(slug => slug !== article.slug));
+      }
+
+      toast({
+        title: newLikedStateForUser ? "Agregado a favoritos" : "Eliminado de favoritos",
+      });
+
+    } catch (error) {
+      console.error("Error processing like: ", error);
+      toast({ variant: "destructive", title: "Error", description: "No se pudo procesar tu 'Me Gusta'." });
+    } finally {
+      setIsProcessingLike(false);
+    }
   };
 
   const handleShareClick = () => {
@@ -83,13 +112,11 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
         toast({ title: "Artículo compartido", description: "Gracias por compartir." });
       }).catch((error) => {
         console.error('Error al compartir:', error);
-        // Fallback para copiar al portapapeles si navigator.share falla o no está disponible
         navigator.clipboard.writeText(window.location.href).then(() => {
           toast({ title: "Enlace copiado", description: "El enlace al artículo ha sido copiado a tu portapapeles." });
         });
       });
     } else {
-      // Fallback para navegadores que no soportan navigator.share
       navigator.clipboard.writeText(window.location.href).then(() => {
         toast({ title: "Enlace copiado", description: "El enlace al artículo ha sido copiado a tu portapapeles." });
       }).catch(err => {
@@ -108,26 +135,31 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
       <Card className="shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-97 duration-500 delay-100">
         <CardHeader className="p-0 relative">
           <div className="relative w-full h-64 md:h-96">
-            <Image
-              src={article.imageUrl || ''} // Provide empty string as fallback for src
-              alt={article.title}
-              fill // Use fill prop
-              style={{ objectFit: 'cover' }} // Use style prop for object-fit
-              data-ai-hint={article.imageHint}
-              priority
-            />
-            {/* Add a fallback if no image is available */}
-            {!article.imageUrl && <div className="absolute inset-0 flex items-center justify-center bg-gray-200 text-gray-500">No Image Available</div>}
+            {article.imageUrl ? (
+              <Image
+                src={article.imageUrl}
+                alt={article.title}
+                fill
+                style={{ objectFit: 'cover' }}
+                data-ai-hint={article.imageHint || 'article details'}
+                priority
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-secondary text-muted-foreground">
+                <ImageIcon className="w-24 h-24" />
+              </div>
+            )}
           </div>
            <div className="absolute top-3 right-3 flex gap-2">
             <Button
               variant="ghost"
               size="icon"
               className="bg-background/70 hover:bg-background/90 text-destructive hover:text-destructive rounded-full h-10 w-10"
-              onClick={handleFavoriteClick}
-              aria-label={isFavorite ? "Quitar de destacados" : "Marcar como destacado"}
+              onClick={handleLikeClick}
+              aria-label={isLikedByUser ? "Quitar de favoritos" : "Marcar como favorito"}
+              disabled={isProcessingLike || !currentUser}
             >
-              <Heart className={cn("h-5 w-5", isFavorite && "fill-destructive")} />
+              {isProcessingLike ? <Loader2 className="h-5 w-5 animate-spin" /> : <Heart className={cn("h-5 w-5", isLikedByUser && "fill-destructive text-destructive")} /> }
             </Button>
              <Button
               variant="ghost"
@@ -146,7 +178,7 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
               <Tag size={14} /> {article.category}
             </Badge>
             <div className="flex items-center text-sm text-muted-foreground">
-              <Heart className={cn("h-4 w-4 mr-1", isFavorite ? "fill-destructive text-destructive" : "text-gray-400")} />
+              <Heart className={cn("h-4 w-4 mr-1", isLikedByUser && currentUser ? "fill-destructive text-destructive" : "text-gray-400")} />
               <span>{rtdbFavoriteCount}</span>
             </div>
           </div>
@@ -199,3 +231,4 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
     </div>
   );
 }
+

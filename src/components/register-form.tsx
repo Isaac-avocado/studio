@@ -77,6 +77,8 @@ export function RegisterForm() {
           email: values.email,
           createdAt: new Date().toISOString(),
           photoURL: null, // Initialize photoURL
+          isAdmin: values.email === 'admin@test.com', // Set isAdmin based on email for testing
+          likedArticles: [], // Initialize likedArticles for new user
         });
       }
 

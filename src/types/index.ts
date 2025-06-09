@@ -16,7 +16,7 @@ export interface Article {
     conclusion?: string;
   };
   readMoreLink?: string;
-  favoriteCount: number; // Se sigue manejando con RTDB
+  favoriteCount: number; // This is the initial seed, RTDB is source of truth for display
   status: 'draft' | 'published'; // Nuevo estado
   authorId?: string; // UID del admin/creador
   createdAt?: Timestamp | Date | string; // Flexible para datos iniciales y Firestore
@@ -35,9 +35,11 @@ export interface FirestoreUser {
   createdAt: string;
   photoURL?: string | null;
   isAdmin?: boolean; // Para la versión de prueba con Firestore
+  likedArticles?: string[]; // Array of article slugs/IDs liked by the user
 }
 
 export interface Category {
   id: string;
   name: string;
 }
+

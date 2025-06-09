@@ -1,6 +1,7 @@
+
 import type { Article, TrafficInfraction, Category } from '@/types';
-import { db, storage } from '@/lib/firebase/config';
-import { collection, getDocs, query, where, getDoc, doc, updateDoc, arrayUnion, arrayRemove, DocumentData, runTransaction, addDoc, deleteDoc } from 'firebase/firestore';
+import { db, storage, auth } from '@/lib/firebase/config'; // Added auth
+import { collection, getDocs, query, where, getDoc, doc, updateDoc, arrayUnion, arrayRemove, DocumentData, runTransaction, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'; // Added serverTimestamp
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // Lista inicial de categorías. Idealmente, esto vendría de Firestore.
@@ -15,10 +16,10 @@ export const initialCategories: Category[] = [
 const articlesCollection = collection(db, 'articles');
 const usersCollection = collection(db, 'users');
 
-const convertFirestoreDocToArticle = (doc: DocumentData): Article => {
-  const data = doc.data();
+const convertFirestoreDocToArticle = (docSnapshot: DocumentData): Article => {
+  const data = docSnapshot.data();
   return {
-    id: doc.id,
+    id: docSnapshot.id,
     slug: data.slug,
     title: data.title,
     shortDescription: data.shortDescription,
@@ -29,8 +30,8 @@ const convertFirestoreDocToArticle = (doc: DocumentData): Article => {
     readMoreLink: data.readMoreLink,
     favoriteCount: data.favoriteCount || 0,
     status: data.status,
-    createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString(),
-    updatedAt: data.updatedAt?.toDate().toISOString() || new Date().toISOString(),
+    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+    updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
   };
 };
 
@@ -72,27 +73,42 @@ export const getArticleById = async (articleId: string): Promise<Article | undef
 
 export const saveArticleToFirestore = async (articleData: any, status: 'draft' | 'published', existingArticleId?: string): Promise<Article> => {
   const { title, shortDescription, category, imageFile, imageUrl, introduction, points, conclusion } = articleData;
-  const slug = title.toLowerCase().replace(/\s+/g, '-').slice(0, 50);
+  const slug = title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').slice(0, 50); // More robust slug generation
 
-  let articleImageUrl = imageUrl;
-  if (imageFile) {
-    // Upload image to Firebase Storage
-    const storageRef = ref(storage, `article_images/${Date.now()}_${imageFile.name}`);
-    const snapshot = await uploadBytes(storageRef, imageFile);
-    articleImageUrl = await getDownloadURL(snapshot.ref);
-  } else if (imageUrl === null && existingArticleId) {
-    // If imageUrl is explicitly set to null and it's an update, delete the old image
-    const existingArticle = await getArticleById(existingArticleId);
-    if (existingArticle?.imageUrl) {
-      const imageRef = ref(storage, existingArticle.imageUrl);
+
+  let finalImageUrl = imageUrl || null;
+  let imageHint = articleData.imageHint || 'article cover';
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error("User must be authenticated to save an article.");
+  }
+
+  const currentArticle = existingArticleId ? await getArticleById(existingArticleId) : null;
+
+  if (imageFile && imageFile[0]) {
+    if (currentArticle?.imageUrl) {
       try {
-        await deleteObject(imageRef);
-        articleImageUrl = null; // Set to null after deletion
-      } catch (error) {
-        console.error("Error deleting old image:", error);
-        // Optionally handle error, maybe keep the old URL or show a warning
+        const oldImageRef = ref(storage, currentArticle.imageUrl);
+        await deleteObject(oldImageRef);
+      } catch (e: any) {
+         if (e.code !== 'storage/object-not-found') console.warn("Could not delete old article image:", e);
       }
     }
+    const fileToUpload = imageFile[0];
+    const storageFileName = `${Date.now()}_${fileToUpload.name.replace(/\s+/g, '_')}`;
+    const imageStorageRef = ref(storage, `article_images/${storageFileName}`);
+    const snapshot = await uploadBytes(imageStorageRef, fileToUpload);
+    finalImageUrl = await getDownloadURL(snapshot.ref);
+    imageHint = `article ${title.substring(0, 20)}`; // Basic hint from title
+  } else if (imageUrl === '' && currentArticle?.imageUrl) { // Image URL cleared, means delete existing
+     try {
+        const oldImageRef = ref(storage, currentArticle.imageUrl);
+        await deleteObject(oldImageRef);
+        finalImageUrl = null;
+      } catch (e: any) {
+         if (e.code !== 'storage/object-not-found') console.warn("Could not delete old article image when URL was cleared:", e);
+      }
   }
 
 
@@ -102,34 +118,34 @@ export const saveArticleToFirestore = async (articleData: any, status: 'draft' |
     conclusion: conclusion || '',
   };
 
-  const articleDataToSave = {
+  const dataToSave = {
     slug,
     title,
     shortDescription: shortDescription || '',
-    category: category || '',
-    imageUrl: articleImageUrl,
-    imageHint: 'custom article', // You might want to make this dynamic
+    category: category || '', // Ensure category is stored as ID
+    imageUrl: finalImageUrl,
+    imageHint,
     content: articleContent,
-    favoriteCount: 0, // New articles start with 0 favorites
     status,
-    // authorId: auth.currentUser?.uid, // Get authorId from auth context if available
-    ...(existingArticleId ? {} : { createdAt: new Date() }), // Set createdAt only for new articles
-    updatedAt: new Date(),
+    authorId: currentUser.uid,
+    updatedAt: serverTimestamp(),
+    ...(existingArticleId ? {} : { createdAt: serverTimestamp(), favoriteCount: 0 }),
   };
 
-  let articleRef;
-  let savedArticleId = existingArticleId;
 
+  let articleRef;
   if (existingArticleId) {
     articleRef = doc(db, 'articles', existingArticleId);
-    await updateDoc(articleRef, articleDataToSave);
+    // Retain existing favoriteCount if updating
+    const currentData = (await getDoc(articleRef)).data();
+    await updateDoc(articleRef, {
+        ...dataToSave,
+        favoriteCount: currentData?.favoriteCount || 0, // Preserve existing fav count
+    });
   } else {
-    const newDocRef = await addDoc(articlesCollection, articleDataToSave);
-    articleRef = newDocRef;
-    savedArticleId = newDocRef.id;
+    articleRef = await addDoc(articlesCollection, dataToSave);
   }
 
-  // Fetch the saved article to return a complete Article object
   const savedDoc = await getDoc(articleRef);
   if (!savedDoc.exists()) {
       throw new Error("Saved article not found!");
@@ -140,65 +156,44 @@ export const saveArticleToFirestore = async (articleData: any, status: 'draft' |
 
 export const deleteArticleFromFirestore = async (articleId: string): Promise<void> => {
   const articleRef = doc(db, 'articles', articleId);
-
-  // Optional: Delete image from storage before deleting the document
   try {
     const articleDoc = await getDoc(articleRef);
     if (articleDoc.exists()) {
       const articleData = articleDoc.data();
       if (articleData?.imageUrl) {
-        // Extract path from the full image URL if necessary
-        // Depending on how you store imageUrl, you might need to parse it
-        const imagePath = articleData.imageUrl.includes(storage.app.options.storageBucket)
-            ? ref(storage, articleData.imageUrl).name // Basic example: get file name from URL if it's a full URL
-            : articleData.imageUrl; // Otherwise assume it's already a path
-
-        const imageRef = ref(storage, `article_images/${imagePath}`); // Reconstruct the storage ref
-        await deleteObject(imageRef);
+        try {
+            const imageStorageRef = ref(storage, articleData.imageUrl); // Direct URL if stored fully
+            await deleteObject(imageStorageRef);
+        } catch (e: any) {
+            if(e.code !== 'storage/object-not-found') console.warn("Could not delete article image:", e);
+        }
       }
     }
+    await deleteDoc(articleRef);
+    // TODO: Also delete corresponding entries in article_favorites in RTDB if any
   } catch (error) {
-    console.error("Error deleting article image from storage:", error);
-    // Continue with document deletion even if image deletion fails
+    console.error("Error deleting article from Firestore:", error);
+    throw error;
   }
-
-  await deleteDoc(articleRef);
 };
 
 
-export const toggleArticleLike = async (userId: string, articleId: string, isLiked: boolean): Promise<void> => {
+export const updateUserArticleLike = async (userId: string, articleSlug: string, shouldBeLiked: boolean): Promise<void> => {
   const userRef = doc(usersCollection, userId);
-  const articleRef = doc(articlesCollection, articleId);
-
-  await runTransaction(db, async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    const articleDoc = await transaction.get(articleRef);
-
-    if (!userDoc.exists()) {
-      throw new Error("User does not exist!");
-    }
-    if (!articleDoc.exists()) {
-      throw new Error("Article does not exist!");
-    }
-
-    const userData = userDoc.data();
-    const articleData = articleDoc.data();
-    const likedArticles = userData?.likedArticles || [];
-    let currentFavoriteCount = articleData?.favoriteCount || 0;
-
-    if (isLiked) {
-      if (!likedArticles.includes(articleId)) {
-        transaction.update(userRef, { likedArticles: arrayUnion(articleId) });
-        transaction.update(articleRef, { favoriteCount: currentFavoriteCount + 1 });
-      }
+  try {
+    if (shouldBeLiked) {
+      await updateDoc(userRef, {
+        likedArticles: arrayUnion(articleSlug)
+      });
     } else {
-      if (likedArticles.includes(articleId)) {
-        transaction.update(userRef, { likedArticles: arrayRemove(articleId) });
-        // Ensure favoriteCount doesn't go below zero
-        transaction.update(articleRef, { favoriteCount: Math.max(0, currentFavoriteCount - 1) });
-      }
+      await updateDoc(userRef, {
+        likedArticles: arrayRemove(articleSlug)
+      });
     }
-  });
+  } catch (error) {
+    console.error("Error updating user article like status in Firestore:", error);
+    throw error; // Re-throw to be caught by the component
+  }
 };
 
 export const getUserLikedArticles = async (userId: string): Promise<string[]> => {
@@ -215,6 +210,7 @@ export const getCategories = (): Category[] => {
     return initialCategories;
 }
 
+// Keep commonTrafficInfractions if used elsewhere, or remove if not.
 export const commonTrafficInfractions: TrafficInfraction[] = [
   { id: 'speeding', name: 'Exceso de velocidad' },
   { id: 'red-light', name: 'No respetar semáforo en rojo' },
@@ -223,3 +219,4 @@ export const commonTrafficInfractions: TrafficInfraction[] = [
   { id: 'mobile-phone', name: 'Uso del celular al manejar' },
   { id: 'seatbelt', name: 'No usar cinturón de seguridad' },
 ];
+
