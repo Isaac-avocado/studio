@@ -183,14 +183,14 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
             </div>
           </div>
 
-          <CardTitle className="text-3xl md:text-4xl font-bold mb-4 text-primary animate-in fade-in-0 slide-in-from-top-3 duration-500 delay-400">
+          <CardTitle className="text-3xl md:text-4xl font-bold mb-4 text-primary break-words animate-in fade-in-0 slide-in-from-top-3 duration-500 delay-400">
             {article.title}
           </CardTitle>
           
           <Separator className="my-6 animate-in fade-in-0 duration-500 delay-500" />
 
           {article.content && typeof article.content === 'object' ? (
-            <div className="prose prose-lg max-w-none text-foreground/90 animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-600">
+            <div className="prose prose-lg max-w-none text-foreground/90 break-words animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-600">
               {article.content.introduction && (
                 <p className="lead text-lg mb-6">{article.content.introduction}</p>
               )}
@@ -231,4 +231,3 @@ export function ArticleViewContent({ article }: ArticleViewContentProps) {
     </div>
   );
 }
-
