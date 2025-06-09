@@ -52,30 +52,30 @@ export function AiSuggester() {
         return;
       }
 
-      const allArticles = await getAllArticles(); // Await the promise
+      const allArticles = await getAllArticles(); 
       const query = searchQuery.toLowerCase();
       const results = allArticles.filter(article =>
         article.title.toLowerCase().includes(query) ||
         article.shortDescription.toLowerCase().includes(query) ||
-        article.category.toLowerCase().includes(query) ||
+        article.category.toLowerCase().includes(query) || // Search by category
         article.content.introduction.toLowerCase().includes(query) ||
-        article.content.points.some(point => point.toLowerCase().includes(query)) ||
+        (article.content.points && Array.isArray(article.content.points) && article.content.points.some(point => point.toLowerCase().includes(query))) ||
         (article.content.conclusion && article.content.conclusion.toLowerCase().includes(query))
       );
-      setLocalSearchResults([]);
+      setLocalSearchResults(results); // Corrected this line
     };
-    fetchAndFilterArticles(); // Call the async function immediately
+    fetchAndFilterArticles(); 
   }, [searchQuery]);
 
   async function onSubmit(values: FormValues) {
     setIsLoading(true);
     setAiAdvice(null);
     setError(null);
-    setSearchQuery('');
+    setSearchQuery(''); // Clear local search when AI query is submitted
     setLocalSearchResults([]);
 
     try {
-      const result = await answerTrafficQuery({ userQuery: values.userQuery }); // Call new AI flow
+      const result = await answerTrafficQuery({ userQuery: values.userQuery }); 
       setAiAdvice(result.advice);
       if (!result.advice) {
         toast({
@@ -99,16 +99,16 @@ export function AiSuggester() {
 
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    if (aiAdvice) setAiAdvice(null);
-    if (error) setError(null);
-    if (form.formState.isSubmitted) form.reset();
+    if (aiAdvice) setAiAdvice(null); // Clear AI advice if user starts a local search
+    if (error) setError(null); // Clear AI error
+    if (form.formState.isSubmitted) form.reset(); // Reset AI form if user types in search
   };
 
   return (
     <Card className="shadow-xl">
       <CardHeader className="text-center ">
         <div className="flex justify-center items-center mb-2 animate-in fade-in-0 zoom-in-95 duration-500 delay-100">
-          <MessageSquareQuote className="w-12 h-12 text-primary" /> {/* Changed MessageSquareQuestion to MessageSquareQuote */}
+          <MessageSquareQuote className="w-12 h-12 text-primary" /> 
         </div>
         <CardTitle className="text-2xl animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-200">Asesoría Vial con IA</CardTitle>
         <CardDescription className="animate-in fade-in-0 slide-in-from-top-2 duration-500 delay-300">
@@ -188,7 +188,7 @@ export function AiSuggester() {
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
             <Input
               type="search"
-              placeholder="Buscar (ej: velocidad, estacionamiento)..."
+              placeholder="Buscar (ej: velocidad, estacionamiento, seguridad vial)..."
               value={searchQuery}
               onChange={handleSearchInputChange}
               className="pl-10"
@@ -202,7 +202,7 @@ export function AiSuggester() {
             <h3 className="text-lg font-semibold mb-3 text-primary">Resultados de Búsqueda Local:</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {localSearchResults.map(article => (
-                <ArticleCard key={article.slug} article={article} />
+                <ArticleCard key={article.slug || article.id} article={article} />
               ))}
             </div>
           </div>
