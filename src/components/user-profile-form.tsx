@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, Mail, Edit3, Camera, Loader2, Save, Trash2, LockKeyhole, ShieldAlert, LogOut, AlertCircle, LinkIcon } from 'lucide-react'; // Added AlertCircle, LinkIcon
+import { User, Mail, Edit3, Camera, Loader2, Save, Trash2, LockKeyhole, ShieldAlert, LogOut, AlertCircle, LinkIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -74,6 +74,15 @@ export function UserProfileForm() {
     },
   });
 
+  const passwordForm = useForm<PasswordChangeFormValues>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmNewPassword: '',
+    },
+  });
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -121,7 +130,7 @@ export function UserProfileForm() {
 
   const handleImageUrlInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const url = event.target.value;
-    profileForm.setValue('imageUrl', url, { shouldDirty: true });
+    profileForm.setValue('imageUrl', url, { shouldDirty: true }); // Update form state
     if (url) {
         // Basic check for URL format, Zod handles full validation on submit
         if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -129,7 +138,12 @@ export function UserProfileForm() {
             profileForm.setValue('profileImageFile', undefined, { shouldDirty: true }); // Clear file if URL is typed
             if (fileInputRef.current) fileInputRef.current.value = '';
         } else if (imagePreviewUrl !== currentUser?.photoURL) { // if input is cleared and preview was not original
-            setImagePreviewUrl(currentUser?.photoURL || null) // revert to original or null
+             // Check if Zod considers the current URL input invalid
+            const { error } = profileSchema.shape.imageUrl.safeParse(url);
+            if (error) { // If current URL input is invalid
+              setImagePreviewUrl(currentUser?.photoURL || null); // Revert to original
+            }
+            // If it's not an error but not a full URL yet, don't revert, let user type
         }
     } else { // URL field is empty
       setImagePreviewUrl(currentUser?.photoURL || null); // Revert to original or null
@@ -189,45 +203,49 @@ export function UserProfileForm() {
     }
     setIsUpdatingProfile(true);
 
-    let newPhotoURL: string | null = imagePreviewUrl; // Start with current preview or null if cleared
+    let newPhotoURL: string | null = currentUser.photoURL; // Start with current user's photoURL
     const oldPhotoURL = currentUser.photoURL;
 
     try {
-      // Determine if we need to delete an old image from storage
-      const shouldDeleteOldStorageImage = oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com') &&
-                                        ((values.profileImageFile && values.profileImageFile[0]) || (values.imageUrl && values.imageUrl !== oldPhotoURL) || newPhotoURL === null);
+        // Determine if we need to delete an old image from storage
+        let shouldDeleteOldStorageImage = false;
 
-      if (shouldDeleteOldStorageImage) {
-        try {
-            const oldImageRef = storageRef(storage, oldPhotoURL);
-            await deleteObject(oldImageRef);
-        } catch (e: any) {
-            if (e.code !== 'storage/object-not-found') {
-                console.warn("Could not delete old profile picture from storage:", e);
+        if (values.profileImageFile && values.profileImageFile[0]) { // New file uploaded
+            if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
+                shouldDeleteOldStorageImage = true;
+            }
+            const file = values.profileImageFile[0];
+            const extension = getFileExtension(file.name);
+            const imageFileName = `profile_image.${extension}`;
+            const imageRef = storageRef(storage, `profile-pictures/${currentUser.uid}/${imageFileName}`);
+            
+            await uploadBytesResumable(imageRef, file);
+            newPhotoURL = await getDownloadURL(imageRef);
+
+        } else if (values.imageUrl && values.imageUrl !== oldPhotoURL) { // New URL provided
+            if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
+                shouldDeleteOldStorageImage = true;
+            }
+            newPhotoURL = values.imageUrl;
+        } else if (imagePreviewUrl === null && oldPhotoURL !== null) { // Image was explicitly removed
+            if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
+                shouldDeleteOldStorageImage = true;
+            }
+            newPhotoURL = null;
+        }
+
+
+        if (shouldDeleteOldStorageImage && oldPhotoURL) { // Ensure oldPhotoURL is not null
+            try {
+                const oldImageRef = storageRef(storage, oldPhotoURL);
+                await deleteObject(oldImageRef);
+            } catch (e: any) {
+                if (e.code !== 'storage/object-not-found') {
+                    console.warn("Could not delete old profile picture from storage:", e);
+                }
             }
         }
-      }
-
-      // Handle new image upload
-      if (values.profileImageFile && values.profileImageFile[0]) {
-        const file = values.profileImageFile[0];
-        const extension = getFileExtension(file.name);
-        const imageFileName = `profile_image.${extension}`;
-        const imageRef = storageRef(storage, `profile-pictures/${currentUser.uid}/${imageFileName}`);
-        
-        const uploadTask = uploadBytesResumable(imageRef, file);
-        await uploadTask;
-        newPhotoURL = await getDownloadURL(imageRef);
-      } else if (values.imageUrl && values.imageUrl !== oldPhotoURL) {
-        // If a new URL is provided and it's different from the old one
-        newPhotoURL = values.imageUrl;
-      } else if (!values.imageUrl && !values.profileImageFile && imagePreviewUrl === null) {
-        // This case covers if the "Remove Picture" was clicked, setting preview to null
-        newPhotoURL = null;
-      }
-      // If no new file, no new URL, and not removed, newPhotoURL retains the current value (which might be oldPhotoURL or a preview of a valid URL input)
-
-
+      
       await updateProfile(currentUser, {
         displayName: values.username,
         photoURL: newPhotoURL,
@@ -241,11 +259,13 @@ export function UserProfileForm() {
       
       setCurrentUser(auth.currentUser); 
       setFirestoreUser(prev => prev ? {...prev, username: values.username, photoURL: newPhotoURL} : null);
+      // Reset form with new values, mark as not dirty
       profileForm.reset({ 
           username: values.username, 
-          profileImageFile: undefined,
+          profileImageFile: undefined, // Clear file input after successful upload/URL use
           imageUrl: newPhotoURL || '' // Update form's imageUrl with the final URL
         }, { keepDirty: false });
+      setImagePreviewUrl(newPhotoURL); // Ensure preview matches the saved state
 
 
       toast({ title: 'Perfil actualizado', description: 'Tu información de perfil ha sido guardada.' });
@@ -254,9 +274,7 @@ export function UserProfileForm() {
       let errorMessage = 'No se pudo actualizar el perfil.';
       if (error.code === 'storage/unauthorized') {
         errorMessage = 'No tienes permiso para subir la imagen. Revisa las reglas de Firebase Storage.';
-      } else if (error.message && error.message.includes('storage/object-not-found') && (values.imageUrl || values.profileImageFile)){
-         // This might happen if the URL pasted is invalid and Firebase tries to treat it as a storage object.
-         // Or if an old image was expected but not found.
+      } else if (error.message && error.message.includes('storage/object-not-found') && (values.imageUrl || (values.profileImageFile && values.profileImageFile[0]))){
          errorMessage = 'Hubo un problema con la URL de la imagen o al acceder a la imagen anterior.';
       }
       toast({ variant: 'destructive', title: 'Error de perfil', description: errorMessage });
@@ -444,14 +462,14 @@ export function UserProfileForm() {
             <Controller
               name="profileImageFile"
               control={profileForm.control}
-              render={({ field }) => (
+              render={({ field }) => ( // field prop is not directly used for input's value/onChange here
                 <Input
                   id="profileImageFile"
                   type="file"
                   accept="image/*"
                   className="hidden"
                   ref={fileInputRef}
-                  onChange={(e) => {
+                  onChange={(e) => { // Directly handle change for file input
                     handleImageFileChange(e);
                   }}
                 />
@@ -648,3 +666,5 @@ export function UserProfileForm() {
     </Card>
   );
 }
+
+    
