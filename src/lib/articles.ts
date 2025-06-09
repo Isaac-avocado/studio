@@ -1,7 +1,7 @@
 
 import type { Article, TrafficInfraction, Category } from '@/types';
 import { db, storage, auth } from '@/lib/firebase/config'; // Added auth
-import { collection, getDocs, query, where, getDoc, doc, updateDoc, arrayUnion, arrayRemove, DocumentData, runTransaction, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'; // Added serverTimestamp
+import { collection, getDocs, query, where, getDoc, doc, updateDoc, arrayUnion, arrayRemove, DocumentData, runTransaction, addDoc, deleteDoc, serverTimestamp, setDoc } from 'firebase/firestore'; // Added serverTimestamp, setDoc
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // Lista inicial de categorías. Idealmente, esto vendría de Firestore.
@@ -182,11 +182,13 @@ export const updateUserArticleLike = async (userId: string, articleSlug: string,
   const userRef = doc(usersCollection, userId);
   try {
     if (shouldBeLiked) {
-      await updateDoc(userRef, {
+      // Use setDoc with merge: true to create the document if it doesn't exist
+      await setDoc(userRef, {
         likedArticles: arrayUnion(articleSlug)
-      });
+      }, { merge: true });
     } else {
-      await updateDoc(userRef, {
+      // Use setDoc with merge: true to create the document if it doesn't exist
+      await setDoc(userRef, {
         likedArticles: arrayRemove(articleSlug)
       });
     }
