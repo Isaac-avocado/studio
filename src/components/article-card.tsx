@@ -1,4 +1,3 @@
-
 // src/components/article-card.tsx
 'use client';
 
@@ -9,14 +8,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ExternalLink, Tag, Heart, MoreVertical, Edit, Send, EyeOff, Trash2, Loader2 } from 'lucide-react';
+import { ExternalLink, Tag, Heart, MoreVertical, Edit, Send, EyeOff, Trash2, Loader2, Image as ImageIcon } from 'lucide-react'; // Added ImageIcon
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { rtdb, auth, db } from '@/lib/firebase/config'; // Added auth, db
+import { rtdb, auth, db } from '@/lib/firebase/config';
 import { ref, onValue, runTransaction, off } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth'; // Added User
-import { getUserLikedArticles, updateUserArticleLike } from '@/lib/articles'; // Added new functions
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getUserLikedArticles, updateUserArticleLike } from '@/lib/articles';
 
 interface ArticleCardProps {
   article: Article;
@@ -24,9 +23,10 @@ interface ArticleCardProps {
   onEdit?: (article: Article) => void;
   onDelete?: (article: Article) => void;
   onTogglePublish?: (article: Article) => void;
+  onLikeUpdated?: () => void; // New prop
 }
 
-export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogglePublish }: ArticleCardProps) {
+export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogglePublish, onLikeUpdated }: ArticleCardProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userLikedArticleSlugs, setUserLikedArticleSlugs] = useState<string[]>([]);
   const [isProcessingLike, setIsProcessingLike] = useState(false);
@@ -38,6 +38,8 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user && article.slug) {
+        // Fetch initial liked state for this card specifically for immediate UI update
+        // The dashboard page will handle the global list for sorting
         const likedSlugs = await getUserLikedArticles(user.uid);
         setUserLikedArticleSlugs(likedSlugs);
       } else {
@@ -45,7 +47,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
       }
     });
     return () => unsubscribeAuth();
-  }, [article.slug]);
+  }, [article.slug]); // Only re-run if article slug changes
 
   useEffect(() => {
     if (!article.slug) {
@@ -58,7 +60,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
       setRtdbFavoriteCount(count !== null ? count : (article.favoriteCount || 0));
     }, (error) => {
       console.error(`Error fetching RTDB count for ${article.slug}:`, error);
-      setRtdbFavoriteCount(article.favoriteCount || 0); // Fallback on error
+      setRtdbFavoriteCount(article.favoriteCount || 0);
     });
     return () => {
       off(favCountRef, 'value', listener);
@@ -83,22 +85,24 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
 
       const articleFavCountRef = ref(rtdb, `article_favorites/${article.slug}/count`);
       await runTransaction(articleFavCountRef, (currentCount) => {
-        if (currentCount === null) { // First like ever for this article or count not set
+        if (currentCount === null) {
           return newLikedStateForUser ? 1 : 0;
         }
         return newLikedStateForUser ? currentCount + 1 : Math.max(0, currentCount - 1);
       });
       
-      // Update local state for UI responsiveness
+      // Update local state for UI responsiveness within this card
       if (newLikedStateForUser) {
         setUserLikedArticleSlugs(prev => [...prev, article.slug]);
       } else {
         setUserLikedArticleSlugs(prev => prev.filter(slug => slug !== article.slug));
       }
-
+      
       toast({
         title: newLikedStateForUser ? "Agregado a favoritos" : "Eliminado de favoritos",
       });
+
+      onLikeUpdated?.(); // Call the callback to notify parent (DashboardPage)
 
     } catch (error) {
       console.error("Error processing like: ", error);
@@ -117,8 +121,15 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
     } catch (error) {
         toast({ variant: "destructive", title: "Error de Admin", description: `No se pudo realizar la acción: ${action}` });
     } finally {
-        if (action === 'togglePublish' || action === 'edit' || action === 'delete') {
+        // Only set processing to false for togglePublish as edit/delete might close/navigate
+        if (action === 'togglePublish') {
             setIsProcessingAdminAction(false);
+        }
+         // For edit and delete, the dialog/confirmation process handles its own loading state or navigation.
+        // If they don't navigate or close a dialog, you might need to set isProcessingAdminAction to false here too.
+        // For now, assuming edit opens a dialog and delete shows a confirmation which handles their states.
+        if (action === 'edit' || action === 'delete') {
+          setTimeout(() => setIsProcessingAdminAction(false), 300); // Small delay to allow other UI updates
         }
     }
   };
@@ -133,7 +144,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
       )}>
       <CardHeader className="p-0 relative">
         <div className="relative w-full h-48">
-          {article.imageUrl && (
+          {article.imageUrl ? (
             <Image
               src={article.imageUrl}
               alt={article.title || 'Article image'}
@@ -142,8 +153,7 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
               data-ai-hint={article.imageHint || 'article image'}
               className={cn((isProcessingAdminAction || isProcessingLike) && "opacity-50")}
             />
-          )}
-          {!article.imageUrl && (
+          ) : (
              <div className="w-full h-full bg-secondary flex items-center justify-center">
                 <ImageIcon className="w-16 h-16 text-muted-foreground" />
             </div>
@@ -164,24 +174,24 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild disabled={isProcessingAdminAction || isProcessingLike}>
                         <Button variant="ghost" size="icon" className="bg-background/70 hover:bg-background/90 rounded-full h-9 w-9">
-                            {(isProcessingAdminAction || isProcessingLike) ? <Loader2 className="h-5 w-5 animate-spin" /> : <MoreVertical className="h-5 w-5" />}
+                            {(isProcessingAdminAction && !isProcessingLike) ? <Loader2 className="h-5 w-5 animate-spin" /> : <MoreVertical className="h-5 w-5" />}
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleAdminAction('edit')} disabled={isProcessingAdminAction || isProcessingLike}>
+                        <DropdownMenuItem onClick={() => handleAdminAction('edit')} disabled={isProcessingAdminAction}>
                             <Edit className="mr-2 h-4 w-4" /> Actualizar
                         </DropdownMenuItem>
                         {article.status === 'published' ? (
-                            <DropdownMenuItem onClick={() => handleAdminAction('togglePublish')} disabled={isProcessingAdminAction || isProcessingLike}>
+                            <DropdownMenuItem onClick={() => handleAdminAction('togglePublish')} disabled={isProcessingAdminAction}>
                                 <EyeOff className="mr-2 h-4 w-4" /> Ocultar (Borrador)
                             </DropdownMenuItem>
                         ) : (
-                            <DropdownMenuItem onClick={() => handleAdminAction('togglePublish')} disabled={isProcessingAdminAction || isProcessingLike}>
+                            <DropdownMenuItem onClick={() => handleAdminAction('togglePublish')} disabled={isProcessingAdminAction}>
                                 <Send className="mr-2 h-4 w-4" /> Publicar
                             </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleAdminAction('delete')} className="text-destructive focus:text-destructive" disabled={isProcessingAdminAction || isProcessingLike}>
+                        <DropdownMenuItem onClick={() => handleAdminAction('delete')} className="text-destructive focus:text-destructive" disabled={isProcessingAdminAction}>
                             <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -219,3 +229,4 @@ export function ArticleCard({ article, isAdmin = false, onEdit, onDelete, onTogg
   );
 }
 
+    

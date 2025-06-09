@@ -1,8 +1,8 @@
 // src/app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react'; // Added useMemo
-import { getPublishedArticles, getDraftArticles, getCategories, saveArticleToFirestore, deleteArticleFromFirestore, getUserLikedArticles } from '@/lib/articles'; // Actualizado, Added getUserLikedArticles
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { getPublishedArticles, getDraftArticles, getCategories, saveArticleToFirestore, deleteArticleFromFirestore, getUserLikedArticles } from '@/lib/articles';
 import { ArticleCard } from '@/components/article-card';
 import { AiSuggester } from '@/components/ai-suggester';
 import { Newspaper, Lightbulb, PlusCircle, Archive, Edit, Send, Trash2, ShieldAlert, Loader2 } from 'lucide-react';
@@ -24,7 +24,7 @@ export default function DashboardPage() {
 
   const [publishedArticles, setPublishedArticles] = useState<Article[]>([]);
   const [draftArticles, setDraftArticles] = useState<Article[]>([]);
-  const [userLikedArticleSlugs, setUserLikedArticleSlugs] = useState<string[]>([]); // New state for liked slugs
+  const [userLikedArticleSlugs, setUserLikedArticleSlugs] = useState<string[]>([]);
 
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -41,32 +41,37 @@ export default function DashboardPage() {
     }
   }, [toast]);
 
+  const fetchUserLikedArticles = useCallback(async (userId: string) => {
+    try {
+      const likedSlugs = await getUserLikedArticles(userId);
+      setUserLikedArticleSlugs(likedSlugs);
+    } catch (error) {
+      console.error("Error fetching user liked articles:", error);
+      setUserLikedArticleSlugs([]); // Default to empty on error
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        if (user.email === 'admin@test.com') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-        // Fetch user's liked articles
-        try {
-          const likedSlugs = await getUserLikedArticles(user.uid);
-          setUserLikedArticleSlugs(likedSlugs);
-        } catch (error) {
-          console.error("Error fetching user liked articles:", error);
-          setUserLikedArticleSlugs([]); // Default to empty on error
-        }
+        setIsAdmin(user.email === 'admin@test.com');
+        fetchUserLikedArticles(user.uid);
       } else {
         setIsAdmin(false);
-        setUserLikedArticleSlugs([]); // Clear liked articles if no user
+        setUserLikedArticleSlugs([]);
       }
       fetchArticles();
     });
 
     return () => unsubscribe();
-  }, [fetchArticles]);
+  }, [fetchArticles, fetchUserLikedArticles]);
+
+  const handleArticleLikeUpdated = useCallback(async () => {
+    if (currentUser) {
+      await fetchUserLikedArticles(currentUser.uid);
+    }
+  }, [currentUser, fetchUserLikedArticles]);
 
   const handleOpenArticleForm = (article?: Article) => {
     setEditingArticle(article || null);
@@ -82,7 +87,7 @@ export default function DashboardPage() {
       });
       setIsArticleFormOpen(false);
       setEditingArticle(null);
-      fetchArticles(); // Re-fetch articles after saving
+      fetchArticles();
 
     } catch (error) {
       console.error("Error en handleSaveArticle:", error);
@@ -100,7 +105,7 @@ export default function DashboardPage() {
     try {
       await deleteArticleFromFirestore(articleToDelete.id);
       toast({ title: "Artículo eliminado", description: `"${articleToDelete.title}" ha sido eliminado.` });
-      fetchArticles(); // Re-fetch articles after deleting
+      fetchArticles();
 
       setArticleToDelete(null);
     } catch (error) {
@@ -122,7 +127,7 @@ export default function DashboardPage() {
           introduction: article.content.introduction,
           points: Array.isArray(article.content.points) ? article.content.points.join('\n') : '',
           conclusion: article.content.conclusion,
-          imageHint: article.imageHint, // Make sure imageHint is passed
+          imageHint: article.imageHint,
       };
 
       await saveArticleToFirestore(
@@ -133,7 +138,7 @@ export default function DashboardPage() {
 
       toast({ title: `Artículo ${newStatus === 'published' ? 'publicado' : 'movido a borradores'}`, description: `"${article.title}" ahora está ${newStatus === 'published' ? 'público' : 'en borradores'}.` });
 
-      fetchArticles(); // Re-fetch articles after status change
+      fetchArticles();
 
     } catch (error) {
       console.error("Error en handleTogglePublishStatus:", error);
@@ -149,10 +154,9 @@ export default function DashboardPage() {
       const aIsLiked = userLikedArticleSlugs.includes(a.slug);
       const bIsLiked = userLikedArticleSlugs.includes(b.slug);
 
-      if (aIsLiked && !bIsLiked) return -1; // a comes first
-      if (!aIsLiked && bIsLiked) return 1;  // b comes first
+      if (aIsLiked && !bIsLiked) return -1;
+      if (!aIsLiked && bIsLiked) return 1;
 
-      // If both are liked, or both are not liked, sort by favoriteCount (descending from Firestore)
       return (b.favoriteCount || 0) - (a.favoriteCount || 0);
     });
   }, [publishedArticles, userLikedArticleSlugs]);
@@ -187,6 +191,7 @@ export default function DashboardPage() {
                             onEdit={() => handleOpenArticleForm(article)}
                             onDelete={() => handleDeleteConfirmation(article)}
                             onTogglePublish={() => handleTogglePublishStatus(article)}
+                            onLikeUpdated={handleArticleLikeUpdated}
                         />
                         </div>
                     ))}
@@ -222,6 +227,7 @@ export default function DashboardPage() {
                     onEdit={() => handleOpenArticleForm(article)}
                     onDelete={() => handleDeleteConfirmation(article)}
                     onTogglePublish={() => handleTogglePublishStatus(article)}
+                    onLikeUpdated={handleArticleLikeUpdated}
                   />
                 </div>
               ))}
@@ -262,3 +268,4 @@ export default function DashboardPage() {
   );
 }
 
+    
