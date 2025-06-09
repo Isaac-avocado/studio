@@ -113,7 +113,7 @@ export const saveArticleToFirestore = async (articleData: any, status: 'draft' |
     favoriteCount: 0, // New articles start with 0 favorites
     status,
     // authorId: auth.currentUser?.uid, // Get authorId from auth context if available
-    createdAt: existingArticleId ? undefined : new Date(), // Set createdAt only for new articles
+    ...(existingArticleId ? {} : { createdAt: new Date() }), // Set createdAt only for new articles
     updatedAt: new Date(),
   };
 

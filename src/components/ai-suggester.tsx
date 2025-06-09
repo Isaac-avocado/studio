@@ -46,22 +46,25 @@ export function AiSuggester() {
   });
 
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setLocalSearchResults([]);
-      return;
-    }
+    const fetchAndFilterArticles = async () => {
+      if (searchQuery.trim() === '') {
+        setLocalSearchResults([]);
+        return;
+      }
 
-    const allArticles = getAllArticles();
-    const query = searchQuery.toLowerCase();
-    const results = allArticles.filter(article =>
-      article.title.toLowerCase().includes(query) ||
-      article.shortDescription.toLowerCase().includes(query) ||
-      article.category.toLowerCase().includes(query) ||
-      article.content.introduction.toLowerCase().includes(query) ||
-      article.content.points.some(point => point.toLowerCase().includes(query)) ||
-      (article.content.conclusion && article.content.conclusion.toLowerCase().includes(query))
-    );
-    setLocalSearchResults(results);
+      const allArticles = await getAllArticles(); // Await the promise
+      const query = searchQuery.toLowerCase();
+      const results = allArticles.filter(article =>
+        article.title.toLowerCase().includes(query) ||
+        article.shortDescription.toLowerCase().includes(query) ||
+        article.category.toLowerCase().includes(query) ||
+        article.content.introduction.toLowerCase().includes(query) ||
+        article.content.points.some(point => point.toLowerCase().includes(query)) ||
+        (article.content.conclusion && article.content.conclusion.toLowerCase().includes(query))
+      );
+      setLocalSearchResults([]);
+    };
+    fetchAndFilterArticles(); // Call the async function immediately
   }, [searchQuery]);
 
   async function onSubmit(values: FormValues) {
